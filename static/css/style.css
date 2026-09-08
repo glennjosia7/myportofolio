@@ -44,6 +44,9 @@
 }
 
 body {
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: var(--ink);
     background-color: var(--paper);
@@ -102,11 +105,14 @@ h3,
     color: var(--accent-dark);
 }
 
+.site-header nav a[aria-current="page"] {
+    color: var(--accent);
+}
+
 /* =========================
    MAIN PORTOFOLIO
 ========================= */
 .portfolio-bg {
-    min-height: 100vh;
     background: linear-gradient(
         180deg,
         #07111F 0%,
@@ -120,6 +126,9 @@ h3,
 ========================= */
 
 .hero {
+    height: 100%;
+    display: grid;
+    align-items: center;
     position: relative;
     background: transparent;
     padding: 80px 20px 50px;
@@ -167,91 +176,58 @@ h3,
 ========================= */
 
 .experience-section {
-    padding: 5rem 0;
+    padding: 4rem 0;
     color: var(--ink);
 }
 
-.section-identity {
-    margin-bottom: 2rem;
-}
-
-.experience-organization {
-    color: var(--accent);
-    font-size: .85rem;
+.section-kicker {
+    color: var(--accent-dark);
+    font-size: .8rem;
     font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
 }
 
-.section-identity h2 {
-    font-size: clamp(2.8rem, 6vw, 4.5rem);
-    line-height: .95;
-    color: var(--ink);
-    margin: .5rem 0 1rem;
+.experience-section h1 {
+    margin: .4rem 0 1.5rem;
+    font-size: 2rem;
 }
 
-.section-intro,
-.experience-points {
-    color: var(--text-muted);
-}
-
-.experience-list {
-    margin-left: .4rem;
-    padding-left: 2rem;
-    list-style: none;
+.experience-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
 }
 
 .experience-card {
-    position: relative;
-    padding-bottom: 2.5rem;
+    padding: 1.25rem;
+    background-color: #0F2747;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
 }
 
-.experience-card:last-child {
-    padding-bottom: 0;
+.experience-category {
+    color: var(--accent);
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
 }
 
-/* Setiap garis berhenti pada titik berikutnya agar tidak melewati timeline. */
-.experience-card::before {
-    content: "";
-    position: absolute;
-    top: .4rem;
-    left: calc(-2rem - .5px);
-    transform: translateX(-50%);
-    width: 12px;
-    height: 12px;
-    background: var(--accent);
-    border: 2px solid var(--paper);
-    border-radius: 50%;
-    z-index: 1;
-}
-
-.experience-card:not(:last-child)::after {
-    content: "";
-    position: absolute;
-    top: calc(.4rem + 8px);
-    bottom: calc(-.4rem - 8px);
-    left: calc(-2rem - .5px);
-    width: 1px;
-    background: var(--line);
-    transform: translateX(-50%);
-}
-
-.experience-card h3 {
-    margin: .25rem 0;
+.experience-card h2 {
+    margin: .5rem 0;
     font-size: 1.25rem;
 }
 
-.experience-timeline {
-    margin-bottom: .75rem;
+.experience-description,
+.empty-state {
     color: var(--text-muted);
-    font-size: .9rem;
 }
 
-.experience-points {
-    padding-left: 1.25rem;
-    max-width: 680px;
-}
-
-.experience-points li + li {
-    margin-top: .5rem;
+.experience-status {
+    margin-top: 1rem;
+    color: var(--accent);
+    font-size: .85rem;
+    font-weight: 600;
 }
 
 /* =========================

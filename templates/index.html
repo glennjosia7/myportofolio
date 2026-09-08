@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glenn Josia Devano - Portfolio</title>
+    <title>{{ name }} - Portfolio</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,10 +16,10 @@
 
     <header class="site-header">
         <div class="container">
-            <a href="#profile" class="brand">Glenn Josia Devano</a>
+            <a href="{% url 'main:show_main' %}" class="brand">{{ name }}</a>
             <nav>
-                <a href="#profile">Profile</a>
-                <a href="#experience">Experience</a>
+                <a href="{% url 'main:show_main' %}" aria-current="page">Profile</a>
+                <a href="{% url 'main:show_experience' %}">Experience</a>
             </nav>
         </div>
     </header>
@@ -33,7 +33,7 @@
 
                 <div class="hero-identity">
                     <p class="hero-kicker">Information Systems &middot; Universitas Indonesia</p>
-                    <h1>Glenn Josia Devano</h1>
+                    <h1>{{ name }}</h1>
                 </div>
 
                 <div class="hero-photo">
@@ -41,24 +41,20 @@
                     <img
                         class="avatar"
                         src="{% static 'img/profile.png' %}"
-                        alt="Photo of Glenn Josia Devano">
+                        alt="Photo of {{ name }}">
                 </div>
 
                 <div class="hero-details">
-                    <p class="bio">
-                        Information Systems student at Universitas Indonesia with a strong focus on 
-                        Cybersecurity, Tech Consulting, and Project Management. 
-                        Passionate about solving complex problems through secure, systems-based solutions.
-                    </p>
+                    <p class="bio">{{ bio }}</p>
 
                     <dl class="meta-list">
                         <div class="meta-row">
                             <dt>NPM</dt>
-                            <dd>2506614712</dd>
+                            <dd>{{ npm }}</dd>
                         </div>
                         <div class="meta-row">
                             <dt>Program</dt>
-                            <dd>S1 Sistem Informasi</dd>
+                            <dd>{{ study_program }}</dd>
                         </div>
                     </dl>
 
@@ -72,61 +68,11 @@
             </div>
         </section>
 
-        <!-- =========================
-        EXPERIENCE
-        ========================= -->
-        <section class="experience-section" id="experience">
-            <div class="container">
-
-                <div class="section-identity">
-                    <h2>Experience</h2>
-                    <p class="section-intro">
-                        Take a closer look at my journey and experience.
-                    </p>
-                </div>
-
-                <ol class="experience-list">
-                    <li class="experience-card">
-                        <p class="experience-organization">COMPFEST 18</p>
-                        <h3>Scientific Committee Staff of Capture The Flag (CTF) Competition</h3>
-                        <p class="experience-timeline">Apr 2026 - Now</p>
-                        <ul class="experience-points">
-                            <li>Design and develop Web Exploitation and Digital Forensics challenges, including concepts, vulnerability scenarios, solve paths, hints, flag validation, and technical documentation.</li>
-                            <li>Contribute to Finals Jeopardy and a specialized 1v1 Tiebreaker challenge, focusing on technical reliability, competitive balance, and participant experience.</li>
-                            <li>Review challenge difficulty, technical accuracy, edge cases, unintended solutions, reproducibility, and infrastructure readiness with the scientific committee.</li>
-                        </ul>
-                    </li>
-
-                    <li class="experience-card">
-                        <p class="experience-organization">RISTEK Fasilkom UI</p>
-                        <h3>Member of Network, Security, and Operating System (NetSOS) SIG</h3>
-                        <p class="experience-timeline">Mar 2026 - Now</p>
-                        <ul class="experience-points">
-                            <li>Contribute to cybersecurity-oriented collaborative projects involving network security, malware analysis, digital forensics, and security-focused application development.</li>
-                            <li>Develop a Digital Forensics challenge for Project BOBOL centered on dynamic malware analysis, including artifact investigation, behavioral analysis, challenge questions, and intended investigation paths.</li>
-                            <li>Participate in technical development, testing, and discussions involving Linux, networking, web security, vulnerability research, digital forensics, and CTF problem solving.</li>
-                        </ul>
-                    </li>
-
-                    <li class="experience-card">
-                        <p class="experience-organization">Open House Fasilkom UI</p>
-                        <h3>Staff of Digital Engagement &amp; Collaborations</h3>
-                        <p class="experience-timeline">Aug 2025 - Nov 2025</p>
-                        <ul class="experience-points">
-                            <li>Awarded Best Staff for outstanding contribution to digital promotion and content creation.</li>
-                            <li>Produced promotional videos, thumbnails, and social media content to support event engagement.</li>
-                            <li>Collaborated with the team and stakeholders to strengthen event visibility and audience reach.</li>
-                        </ul>
-                    </li>
-                </ol>
-
-            </div>
-        </section>
     </main>
 
     <footer class="site-footer">
         <div class="container">
-            <p>&copy; 2026 Glenn Josia Devano. Universitas Indonesia.</p>
+            <p>&copy; 2026 {{ name }}. Universitas Indonesia.</p>
         </div>
     </footer>
 
