@@ -1,7 +1,4 @@
-django
-gunicorn
-whitenoise
-psycopg2-binary
+django~=5.0
 requests
 urllib3
 python-dotenv
