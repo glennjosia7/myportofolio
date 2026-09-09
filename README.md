@@ -6,7 +6,7 @@ Website portofolio pribadi untuk menampilkan profil dan pengalaman organisasi. P
 
 - Nama: Glenn Josia Devano
 - NPM: 2506614712
-- Kelas: PBP C
+- Kelas: PBP F
 
 ## Fitur
 
