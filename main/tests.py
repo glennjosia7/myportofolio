@@ -9,11 +9,8 @@ class MainTest(TestCase):
     def setUp(self):
         self.experience = Experience.objects.create(
             title="RISTEK Fasilkom UI - Member of NetSOS SIG",
-            description=(
-                "Develop a Digital Forensics challenge for Project "
-                "bobol.netsos.id."
-            ),
-            category="organization",
+            description="Develop a Digital Forensics challenge for Project bobol.netsos.id.",
+            category="research",
         )
 
     def test_main_url_is_accessible(self):
@@ -31,7 +28,7 @@ class MainTest(TestCase):
 
     def test_experience_model(self):
         self.assertEqual(str(self.experience), "RISTEK Fasilkom UI - Member of NetSOS SIG")
-        self.assertEqual(self.experience.category, "organization")
+        self.assertEqual(self.experience.category, "research")
         self.assertTrue(self.experience.is_ongoing)
 
     def test_experience_page(self):
@@ -41,15 +38,15 @@ class MainTest(TestCase):
         self.assertTemplateUsed(response, "experience.html")
         self.assertContains(response, self.experience.title)
         self.assertContains(response, self.experience.description)
-        self.assertContains(response, "Organization")
-        self.assertContains(response, "Ongoing")
+        self.assertContains(response, "Research")
+        self.assertContains(response, "Sedang berlangsung")
         self.assertContains(response, f'href="{reverse("main:show_main")}"')
 
     def test_empty_experience_page(self):
         Experience.objects.all().delete()
         response = self.client.get(reverse("main:show_experience"))
 
-        self.assertContains(response, "No experiences have been added yet.")
+        self.assertContains(response, "Belum ada pengalaman yang ditambahkan.")
 
     def test_completed_experience(self):
         self.experience.ended_at = timezone.now()
@@ -57,5 +54,5 @@ class MainTest(TestCase):
         response = self.client.get(reverse("main:show_experience"))
 
         self.assertFalse(self.experience.is_ongoing)
-        self.assertContains(response, "Completed")
-        self.assertNotContains(response, "Ongoing")
+        self.assertContains(response, "Selesai")
+        self.assertNotContains(response, "Sedang berlangsung")

@@ -19,17 +19,17 @@
             <a href="{% url 'main:show_main' %}" class="brand">{{ name }}</a>
             <nav>
                 <a href="{% url 'main:show_main' %}">Profile</a>
-                <a href="{% url 'main:show_experience' %}" aria-current="page">Experience</a>
+                <a href="{% url 'main:show_experience' %}">Experience</a>
             </nav>
         </div>
     </header>
 
-    <main class="portfolio-bg">
+    <main>
         <section class="experience-section" id="experience">
             <div class="container">
-                <p class="section-kicker">My journey so far</p>
+                <p class="section-kicker">Perjalanan saya sejauh ini</p>
                 <h1>Experience</h1>
-
+    
                 <div class="experience-grid">
                     {% for experience in experience_list %}
                         <article class="experience-card">
@@ -40,16 +40,16 @@
                             <p class="experience-description">
                                 {{ experience.description }}
                             </p>
-
+    
                             {% if experience.is_ongoing %}
-                                <p class="experience-status">Ongoing</p>
+                                <p class="experience-status">Sedang berlangsung</p>
                             {% else %}
-                                <p class="experience-status">Completed</p>
+                                <p class="experience-status">Selesai</p>
                             {% endif %}
                         </article>
                     {% empty %}
                         <p class="empty-state">
-                            No experiences have been added yet.
+                            Belum ada pengalaman yang ditambahkan.
                         </p>
                     {% endfor %}
                 </div>
