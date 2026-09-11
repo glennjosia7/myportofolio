@@ -1,0 +1,41 @@
+[
+  {
+    "model": "main.experience",
+    "pk": "81c6f16e-113b-4ee8-9d75-a6e7e21b7c01",
+    "fields": {
+      "title": "COMPFEST 18 - CTF Scientific Committee Staff",
+      "description": "Design Web Exploitation and Digital Forensics challenges.\nReview solve paths, edge cases, and challenge reliability.",
+      "category": "committee",
+      "thumbnail": null,
+      "logo": "img/compfest-18.webp",
+      "started_at": "2026-04-01T00:00:00Z",
+      "ended_at": null
+    }
+  },
+  {
+    "model": "main.experience",
+    "pk": "152ada66-7ea2-4264-afda-e1ab5f38d13d",
+    "fields": {
+      "title": "RISTEK Fasilkom UI - Member of NetSOS SIG",
+      "description": "Develop a Digital Forensics challenge for Project bobol.netsos.id.\nExplore network security, malware analysis, and CTF problem solving.",
+      "category": "organization",
+      "thumbnail": null,
+      "logo": "img/ristek-icon.svg",
+      "started_at": "2026-03-01T00:00:00Z",
+      "ended_at": null
+    }
+  },
+  {
+    "model": "main.experience",
+    "pk": "cf7e97ac-ae51-4b7f-9d0c-8a9bbbe2d502",
+    "fields": {
+      "title": "Open House Fasilkom UI 2025 - DEC Staff",
+      "description": "Produced promotional videos, thumbnails, and social media content.\nAwarded Best Staff for contribution to digital promotion.",
+      "category": "committee",
+      "thumbnail": null,
+      "logo": "img/open-house-2025.png",
+      "started_at": "2025-08-01T00:00:00Z",
+      "ended_at": "2025-11-30T00:00:00Z"
+    }
+  }
+]

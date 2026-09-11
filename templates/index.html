@@ -1,80 +1,97 @@
+{% extends 'base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ name }} - Portfolio</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-</head>
-<body>
-
-    <header class="site-header">
-        <div class="container">
-            <a href="{% url 'main:show_main' %}" class="brand">{{ name }}</a>
-            <nav>
-                <a href="{% url 'main:show_main' %}">Profile</a>
-                <a href="{% url 'main:show_experience' %}">Experience</a>
-            </nav>
+{% block content %}
+<section class="hero" id="profile" aria-labelledby="profile-title">
+    <div class="container hero-grid">
+        <div class="hero-identity">
+            <p class="section-kicker">Information Systems &middot; Universitas Indonesia</p>
+            <h1 id="profile-title">{{ name }}</h1>
         </div>
-    </header>
-
-    <main class="portfolio-bg">
-        <!-- =========================
-        PROFILE
-        ========================= -->
-        <section class="hero" id="profile">
-            <div class="container hero-grid">
-
-                <div class="hero-identity">
-                    <p class="hero-kicker">Information Systems &middot; Universitas Indonesia</p>
-                    <h1>{{ name }}</h1>
+        <figure class="hero-photo">
+            <img class="avatar" src="{% static 'img/profile.png' %}" alt="Photo of {{ name }}" width="600" height="600">
+        </figure>
+        <div class="hero-details">
+            <p class="bio">{{ bio }}</p>
+            <dl class="meta-list">
+                <div>
+                    <dt>NPM</dt>
+                    <dd>{{ npm }}</dd>
                 </div>
-
-                <div class="hero-photo">
-                    <div class="photo-block"></div>
-                    <img
-                        class="avatar"
-                        src="{% static 'img/profile.png' %}"
-                        alt="Photo of {{ name }}">
+                <div>
+                    <dt>Program</dt>
+                    <dd>{{ study_program }}</dd>
                 </div>
-
-                <div class="hero-details">
-                    <p class="bio">{{ bio }}</p>
-
-                    <dl class="meta-list">
-                        <div class="meta-row">
-                            <dt>NPM</dt>
-                            <dd>{{ npm }}</dd>
-                        </div>
-                        <div class="meta-row">
-                            <dt>Program</dt>
-                            <dd>{{ study_program }}</dd>
-                        </div>
-                    </dl>
-
-                    <div class="social-links">
-                        <a href="https://github.com/DevCoder-7/" class="social-link">GitHub</a>
-                        <a href="https://www.linkedin.com/in/glenn-josia-devano/" class="social-link">LinkedIn</a>
-                        <a href="mailto:glennjosiadevano07@gmail.com" class="social-link">Email</a>
-                    </div>
-                </div>
-
+            </dl>
+            <div class="social-links" aria-label="Social links">
+                <a href="https://github.com/DevCoder-7/">GitHub <span aria-hidden="true">&#8599;</span></a>
+                <a href="https://www.linkedin.com/in/glenn-josia-devano/">LinkedIn <span aria-hidden="true">&#8599;</span></a>
+                <a href="mailto:glennjosiadevano07@gmail.com">Email <span aria-hidden="true">&#8599;</span></a>
             </div>
-        </section>
-
-    </main>
-
-    <footer class="site-footer">
-        <div class="container">
-            <p>&copy; 2026 {{ name }}. Universitas Indonesia.</p>
         </div>
-    </footer>
+    </div>
+</section>
 
-</body>
-</html>
+<section class="dashboard-section" aria-labelledby="experience-preview-title">
+    <div class="container">
+        <div class="section-heading-row">
+            <div>
+                <p class="section-kicker">Selected experience</p>
+                <h2 id="experience-preview-title">What I have been working on<span class="accent">.</span></h2>
+            </div>
+            <a class="section-link" href="{% url 'main:show_experience' %}">View experience <span aria-hidden="true">&#8594;</span></a>
+        </div>
+        <ol class="experience-list experience-preview">
+            {% for experience in experience_list %}
+                <li class="experience-item">
+                    <article class="experience-card">
+                        <span class="experience-brand{% if experience.logo %} has-logo{% endif %}" aria-hidden="true">
+                            {% if experience.logo %}<img src="{% static experience.logo %}" alt="">{% else %}{{ experience.title|first }}{% endif %}
+                        </span>
+                        <div class="experience-content">
+                            <div class="experience-meta">
+                                <span class="section-kicker">{{ experience.get_category_display }}</span>
+                                <span class="experience-status{% if experience.is_ongoing %} is-ongoing{% endif %}">
+                                    {% if experience.is_ongoing %}Ongoing{% else %}Completed{% endif %}
+                                </span>
+                            </div>
+                            <h3>{{ experience.title }}</h3>
+                            <p>{{ experience.description|truncatewords:16 }}</p>
+                        </div>
+                    </article>
+                </li>
+            {% empty %}
+                <li class="empty-state">No experience added yet.</li>
+            {% endfor %}
+        </ol>
+    </div>
+</section>
+
+<section class="dashboard-section" aria-labelledby="achievement-preview-title">
+    <div class="container">
+        <div class="section-heading-row">
+            <div>
+                <p class="section-kicker">Selected achievements</p>
+                <h2 id="achievement-preview-title">Competition highlights<span class="accent">.</span></h2>
+            </div>
+            <a class="section-link" href="{% url 'main:show_achievements' %}">View achievements <span aria-hidden="true">&#8594;</span></a>
+        </div>
+        <ul class="achievement-grid achievement-preview">
+            {% for achievement in achievement_list %}
+                <li class="achievement-card">
+                    <a class="evidence-link" href="{% static achievement.evidence_image %}" target="_blank" rel="noopener">
+                        <img src="{% static achievement.evidence_image %}" alt="Evidence for {{ achievement.result }} at {{ achievement.title }}" loading="lazy">
+                    </a>
+                    <div class="achievement-copy">
+                        <p class="achievement-result">{{ achievement.result }}{% if achievement.year %} &middot; {{ achievement.year }}{% endif %}</p>
+                        <h3>{{ achievement.title }}</h3>
+                        <p>{{ achievement.organizer }}</p>
+                    </div>
+                </li>
+            {% empty %}
+                <li class="empty-state">No achievements added yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</section>
+{% endblock %}

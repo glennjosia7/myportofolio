@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Achievements - {{ name }}{% endblock %}
+
+{% block content %}
+<section class="page-section container" id="achievements" aria-labelledby="achievements-title">
+    <header class="page-heading">
+        <p class="section-kicker">Awards &amp; competitions</p>
+        <h1 id="achievements-title">Achievements<span class="accent">.</span></h1>
+        <p class="page-intro">Results from Capture The Flag competitions.</p>
+    </header>
+    <ul class="achievement-grid">
+        {% for achievement in achievement_list %}
+            <li class="{% if achievement.evidence_image %}achievement-card{% else %}achievement-text-row{% endif %}">
+                {% if achievement.evidence_image %}
+                    <a class="evidence-link" href="{% static achievement.evidence_image %}" target="_blank" rel="noopener">
+                        <img src="{% static achievement.evidence_image %}" alt="Evidence for {{ achievement.result }} at {{ achievement.title }}" loading="lazy">
+                    </a>
+                {% endif %}
+                <div class="achievement-copy">
+                    <p class="achievement-result">{{ achievement.result }}{% if achievement.year %} &middot; {{ achievement.year }}{% endif %}</p>
+                    <h2>{{ achievement.title }}</h2>
+                    <p>{{ achievement.organizer }}</p>
+                    {% if not achievement.evidence_image %}<span class="evidence-note">Evidence file not attached</span>{% endif %}
+                </div>
+            </li>
+        {% empty %}
+            <li class="empty-state">No achievements added yet.</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}

@@ -1,0 +1,57 @@
+[
+  {
+    "model": "main.achievement",
+    "pk": 1,
+    "fields": {
+      "title": "POLRI CTF",
+      "result": "1st Place",
+      "organizer": "E-Sport Kapolri Cup in collaboration with SiberLab.id",
+      "evidence_image": "img/achievements/polri-ctf-award.jpeg",
+      "year": 2026
+    }
+  },
+  {
+    "model": "main.achievement",
+    "pk": 2,
+    "fields": {
+      "title": "WreckIT! 7.0 CTF Competition",
+      "result": "Finalist",
+      "organizer": "Politeknik Siber dan Sandi Negara",
+      "evidence_image": "img/achievements/wreckit-finalist.png",
+      "year": 2026
+    }
+  },
+  {
+    "model": "main.achievement",
+    "pk": 3,
+    "fields": {
+      "title": "FINDIT! CTF",
+      "result": "Finalist",
+      "organizer": "DTETI FT Universitas Gadjah Mada (UGM)",
+      "evidence_image": "img/achievements/findit-finalist.png",
+      "year": 2026
+    }
+  },
+  {
+    "model": "main.achievement",
+    "pk": 4,
+    "fields": {
+      "title": "DSG Zero Day CTF Open Arena",
+      "result": "Top 10 Honorable Mention",
+      "organizer": "PT Digital Solusi Grup",
+      "evidence_image": "img/achievements/dsg-zero-day.png",
+      "year": 2026
+    }
+  },
+  {
+    "model": "main.achievement",
+    "pk": 5,
+    "fields": {
+      "title": "Global Cyber Skills Benchmark 2026",
+      "result": "62nd of 589 Teams",
+      "organizer": "Hack The Box",
+      "evidence_image": "img/achievements/htb-global-2026.png",
+      "year": 2026
+    }
+  }
+]

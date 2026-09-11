@@ -1,67 +1,41 @@
+{% extends 'base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Experience - {{ name }}</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+{% block title %}Experience - {{ name }}{% endblock %}
 
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-</head>
-<body>
-
-    <header class="site-header">
-        <div class="container">
-            <a href="{% url 'main:show_main' %}" class="brand">{{ name }}</a>
-            <nav>
-                <a href="{% url 'main:show_main' %}">Profile</a>
-                <a href="{% url 'main:show_experience' %}">Experience</a>
-            </nav>
-        </div>
+{% block content %}
+<section class="page-section container" id="experience" aria-labelledby="experience-title">
+    <header class="page-heading">
+        <p class="section-kicker">Community &amp; collaboration</p>
+        <h1 id="experience-title">Experience<span class="accent">.</span></h1>
+        <p class="page-intro">Learning and contributing through security projects.</p>
     </header>
-
-    <main>
-        <section class="experience-section" id="experience">
-            <div class="container">
-                <p class="section-kicker">Perjalanan saya sejauh ini</p>
-                <h1>Experience</h1>
-    
-                <div class="experience-grid">
-                    {% for experience in experience_list %}
-                        <article class="experience-card">
-                            <span class="experience-category">
-                                {{ experience.get_category_display }}
+    <ol class="experience-list">
+        {% for experience in experience_list %}
+            <li class="experience-item">
+                <article class="experience-card">
+                    <span class="experience-brand{% if experience.logo %} has-logo{% endif %}" aria-hidden="true">
+                        {% if experience.logo %}<img src="{% static experience.logo %}" alt="">{% else %}{{ experience.title|first }}{% endif %}
+                    </span>
+                    <div class="experience-content">
+                        <div class="experience-meta">
+                            <span class="section-kicker">{{ experience.get_category_display }}</span>
+                            <span class="experience-status{% if experience.is_ongoing %} is-ongoing{% endif %}">
+                                {% if experience.is_ongoing %}Ongoing{% else %}Completed{% endif %}
                             </span>
-                            <h2>{{ experience.title }}</h2>
-                            <p class="experience-description">
-                                {{ experience.description }}
-                            </p>
-    
-                            {% if experience.is_ongoing %}
-                                <p class="experience-status">Sedang berlangsung</p>
-                            {% else %}
-                                <p class="experience-status">Selesai</p>
-                            {% endif %}
-                        </article>
-                    {% empty %}
-                        <p class="empty-state">
-                            Belum ada pengalaman yang ditambahkan.
-                        </p>
-                    {% endfor %}
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <footer class="site-footer">
-        <div class="container">
-            <p>&copy; 2026 {{ name }}. Universitas Indonesia.</p>
-        </div>
-    </footer>
-
-</body>
-</html>
+                        </div>
+                        <h2>{{ experience.title }}</h2>
+                        <ul class="experience-points">
+                            {% for point in experience.description.splitlines %}
+                                {% if point %}<li>{{ point }}</li>{% endif %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </article>
+            </li>
+        {% empty %}
+            <li class="empty-state">No experience added yet.</li>
+        {% endfor %}
+    </ol>
+</section>
+{% endblock %}

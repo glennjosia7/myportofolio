@@ -1,3 +1,6 @@
 from django.contrib import admin
 
-# Register your models here.
+from main.models import Achievement, Experience
+
+admin.site.register(Achievement)
+admin.site.register(Experience)

@@ -1,0 +1,36 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#071525">
+    <title>{% block title %}{{ name }} - Portfolio{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="{% url 'main:show_main' %}" class="brand">{{ name }}<span aria-hidden="true">.</span></a>
+            <nav aria-label="Main navigation">
+                <a href="{% url 'main:show_main' %}"{% if request.resolver_match.url_name == 'show_main' %} aria-current="page"{% endif %}>Profile</a>
+                <a href="{% url 'main:show_experience' %}"{% if request.resolver_match.url_name == 'show_experience' %} aria-current="page"{% endif %}>Experience</a>
+                <a href="{% url 'main:show_achievements' %}"{% if request.resolver_match.url_name == 'show_achievements' %} aria-current="page"{% endif %}>Achievements</a>
+            </nav>
+        </div>
+    </header>
+    <main id="main-content" tabindex="-1">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <p>&copy; {% now "Y" %} {{ name }}</p>
+            <p>Information Systems &middot; Universitas Indonesia</p>
+        </div>
+    </footer>
+</body>
+</html>

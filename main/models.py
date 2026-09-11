@@ -9,6 +9,8 @@ class Experience(models.Model):
         ('part-time', 'Part-Time'),
         ('full-time', 'Full-Time'),
         ('freelance', 'Freelance'),
+        ('organization', 'Organization'),
+        ('committee', 'Committee'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -16,6 +18,7 @@ class Experience(models.Model):
     description = models.TextField()
     category = models.CharField(max_length=20, choices=EXPERIENCE_CHOICES, default='full-time')
     thumbnail = models.URLField(blank=True, null=True)
+    logo = models.CharField(max_length=255, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(blank=True, null=True)
     def __str__(self):
@@ -24,3 +27,15 @@ class Experience(models.Model):
     @property
     def is_ongoing(self):
         return self.ended_at is None
+
+
+class Achievement(models.Model):
+    title = models.CharField(max_length=255)
+    result = models.CharField(max_length=100)
+    organizer = models.CharField(max_length=255)
+    evidence_image = models.CharField(max_length=255, blank=True)
+    # CV tidak selalu mencantumkan tahun, jadi field ini boleh kosong.
+    year = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.result} - {self.title}"
