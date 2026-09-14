@@ -510,6 +510,18 @@ a:focus-visible {
     font-size: .75rem;
 }
 
+.site-messages {
+    padding-top: 1rem;
+}
+
+.site-message {
+    padding: .75rem 1rem;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    color: var(--ink);
+    background: rgba(54, 194, 174, .1);
+}
+
 @media (max-width: 960px) {
     .hero-grid {
         gap: 2rem 3rem;

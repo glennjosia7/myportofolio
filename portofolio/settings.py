@@ -156,5 +156,5 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# gunakan https:// untuk trailing urlnya
-CSRF_TRUSTED_ORIGINS = ["https://glenn-josia-myportofolio.pws.cs.ui.ac.id/"]
+# gunakan https:// tanpa trailing slash
+CSRF_TRUSTED_ORIGINS = ["https://glenn-josia-myportofolio.pws.cs.ui.ac.id"]

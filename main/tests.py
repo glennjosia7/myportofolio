@@ -1,9 +1,11 @@
+import json
+
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from django.contrib.staticfiles import finders
 
-from main.models import Achievement, Experience
+from main.models import Achievement, Experience, Project
 
 
 class MainTest(TestCase):
@@ -140,7 +142,7 @@ class AchievementTest(TestCase):
         self.assertNotContains(response, "<script>")
 
     def test_shared_navigation_and_footer_on_every_page(self):
-        routes = ["show_main", "show_experience", "show_achievements"]
+        routes = ["show_main", "show_experience", "show_achievements", "show_projects"]
         for current in routes:
             with self.subTest(page=current):
                 response = self.client.get(reverse(f"main:{current}"))
@@ -203,3 +205,97 @@ class ExperienceFixtureTest(TestCase):
         self.assertEqual(len(response.context["experience_list"]), 3)
         self.assertContains(response, "COMPFEST 18")
         self.assertContains(response, "Open House Fasilkom UI 2025")
+
+
+class ProjectTest(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            title="Portfolio Website",
+            description="A personal portfolio built with Django.",
+            tech_stack="Django, Python, HTML, CSS",
+            project_url="https://github.com/glennjosia7/myportofolio",
+        )
+
+    def test_projects_page_uses_json_data_and_title_filter(self):
+        other_project = Project.objects.create(
+            title="Unrelated Project",
+            description="Another project.",
+            tech_stack="Python",
+        )
+        response = self.client.get(
+            reverse("main:show_projects"),
+            {"title": "portfolio"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "project.html")
+        self.assertEqual(
+            [project.title for project in response.context["project_list"]],
+            [self.project.title],
+        )
+        self.assertContains(response, self.project.title)
+        self.assertNotContains(response, other_project.title)
+        self.assertContains(response, 'value="portfolio"')
+
+    def test_projects_json_endpoint_serializes_projects(self):
+        response = self.client.get(reverse("main:get_projects_json"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/json")
+        data = json.loads(response.content)
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["model"], "main.project")
+        self.assertEqual(data[0]["fields"]["title"], self.project.title)
+
+    def test_create_project_with_form(self):
+        response = self.client.get(reverse("main:create_project"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "projects_form.html")
+        self.assertContains(response, "Nama Proyek")
+
+        response = self.client.post(
+            reverse("main:create_project"),
+            {
+                "title": "Security Lab",
+                "description": "A small project for security practice.",
+                "tech_stack": "Python",
+                "project_url": "",
+                "project_image_url": "",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Project.objects.filter(title="Security Lab").exists())
+        self.assertContains(response, "Proyek baru berhasil ditambahkan!")
+
+    def test_create_project_rejects_invalid_form(self):
+        response = self.client.post(
+            reverse("main:create_project"),
+            {
+                "title": "",
+                "description": "",
+                "tech_stack": "",
+                "project_url": "",
+                "project_image_url": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "projects_form.html")
+        self.assertEqual(Project.objects.count(), 1)
+        self.assertTrue(response.context["form"].errors)
+
+    def test_delete_project_requires_post(self):
+        get_response = self.client.get(
+            reverse("main:delete_project", args=[self.project.id])
+        )
+        self.assertEqual(get_response.status_code, 302)
+        self.assertTrue(Project.objects.filter(pk=self.project.id).exists())
+
+        post_response = self.client.post(
+            reverse("main:delete_project", args=[self.project.id])
+        )
+        self.assertEqual(post_response.status_code, 302)
+        self.assertFalse(Project.objects.filter(pk=self.project.id).exists())

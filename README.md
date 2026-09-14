@@ -1,6 +1,6 @@
 # Portofolio Glenn Josia Devano
 
-Website portofolio pribadi dengan halaman Profile, Experience, dan Achievements. Proyek ini dibuat dengan Django, HTML5, dan CSS3 sebagai pengembangan Tutorial 02 dan Tugas 2 PBP.
+Website portofolio pribadi dengan halaman Profile, Experience, Achievements, dan Projects. Proyek ini dibuat dengan Django, HTML5, dan CSS3 sebagai pengembangan Tutorial 02, Tugas 2, dan Tutorial 03 PBP.
 
 ## Identitas
 
@@ -14,6 +14,7 @@ Website portofolio pribadi dengan halaman Profile, Experience, dan Achievements.
 - Timeline Experience yang mengambil tiga pengalaman dari database, dengan status Ongoing atau Completed.
 - Halaman Achievements berisi lima hasil kompetisi CTF dari database dan bukti masing-masing.
 - Halaman utama memuat preview Experience dan Achievement dengan tautan menuju halaman lengkap.
+- Halaman Projects dengan form tambah data, pencarian berdasarkan judul, endpoint JSON, dan konfirmasi penghapusan.
 - Navbar transparan dengan blur, tetap di atas saat di-scroll, dan penanda halaman aktif.
 - Navbar dan footer bersama melalui template inheritance Django.
 - Tampilan responsif untuk layar desktop, tablet, dan perangkat seluler.
@@ -42,16 +43,16 @@ Buka `http://127.0.0.1:8000/` pada browser setelah server berjalan.
 
 Perintah `loaddata experiences achievements` mengisi tiga pengalaman dan lima prestasi dari fixture JSON. Jalankan saat pertama menyiapkan database. Menjalankannya ulang akan mengembalikan objek dengan ID yang sama ke isi fixture, termasuk menimpa perubahan pada objek tersebut.
 
-Untuk mengelola data tanpa mengedit HTML, jalankan `python manage.py createsuperuser`, lalu masuk ke `/admin/`. Model Achievement dan Experience sudah terdaftar. Pada deskripsi Experience, satu baris teks akan ditampilkan sebagai satu poin. Field `logo` menyimpan path static untuk logo COMPFEST, RISTEK, dan Open House Fasilkom UI 2025. Jangan bagikan kredensial admin atau berkas `.env`.
+Untuk mengelola data tanpa mengedit HTML, jalankan `python manage.py createsuperuser`, lalu masuk ke `/admin/`. Model Achievement, Experience, dan Project sudah terdaftar. Pada deskripsi Experience, satu baris teks akan ditampilkan sebagai satu poin. Field `logo` menyimpan path static untuk logo COMPFEST, RISTEK, dan Open House Fasilkom UI 2025. Data Project dapat ditambahkan melalui `/projects/add/`. Jangan bagikan kredensial admin atau berkas `.env`.
 
 Untuk database di PWS, migrasi dan pengisian data perlu dijalankan di lingkungan PWS juga; isi SQLite lokal tidak ikut terkirim melalui Git. Pengembangan ini belum di-deploy ulang.
 
 ## Alur Sederhana Aplikasi
 
 1. `portofolio/urls.py` menerima pola URL dan meneruskannya ke `main/urls.py` melalui `include`.
-2. `/` memanggil `show_main`, `/experience/` memanggil `show_experience`, dan `/achievements/` memanggil `show_achievements`.
-3. View menyiapkan context. View Experience dan Achievements mengambil QuerySet dari model masing-masing.
-4. Template halaman mengisi blok pada `templates/base.html`. Daftar data ditampilkan melalui `{% for %}`, dengan `{% empty %}` untuk database kosong.
+2. `/` memanggil `show_main`, `/experience/` memanggil `show_experience`, `/achievements/` memanggil `show_achievements`, dan `/projects/` memanggil `show_projects`.
+3. View menyiapkan context. View Experience dan Achievements mengambil QuerySet, sedangkan View Projects mengambil response JSON lalu melakukan deserialize.
+4. Template halaman mengisi blok pada `templates/base.html`. Daftar data ditampilkan melalui `{% for %}`, dengan `{% empty %}` untuk database kosong. Form Project memakai `ProjectForm`, sedangkan penghapusan memakai request `POST` dengan CSRF token.
 5. Browser menerima HTML dan memuat stylesheet serta foto dari static files.
 
 Bagian yang perlu dikenali untuk melanjutkan proyek:
@@ -154,6 +155,17 @@ Test lokal masih mengeluarkan peringatan WhiteNoise karena folder hasil `collect
 
 Arah hero mempertahankan [portofolio sebelumnya](https://portofolio-website-sand.vercel.app/#experience): foto persegi dengan bidang putih offset, tombol sosial solid, dan latar navy. Timeline tetap ringkas, dengan logo persegi di sisi kiri seperti susunan Experience pada LinkedIn. Palet navy-teal dipakai secara konsisten agar tidak menyalin tampilan referensi teman. Kartu Achievement memakai thumbnail dengan konteks pendek. Implementasinya tetap HTML/CSS dan template Django, tanpa React, library UI, atau JavaScript. Referensi teknis: [fixture Django](https://docs.djangoproject.com/en/5.2/howto/initial-data/), [CSS position](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/position), dan [backdrop-filter](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/backdrop-filter).
 
+### Tutorial 3
+
+- Membuat `base.html` sebagai template dasar untuk navbar, footer, metadata, dan content block.
+- Menambahkan model `Project`, migration, `ProjectForm`, serta halaman `/projects/add/`.
+- Menambahkan halaman `/projects/` yang dapat mencari project berdasarkan judul.
+- Menambahkan endpoint `/api/projects/` yang mengirim data Project dalam format JSON.
+- Mengubah `show_projects` agar membaca response JSON dan melakukan deserialize sebelum merender template.
+- Menambahkan penghapusan Project melalui request `POST` dengan CSRF token dan konfirmasi popover.
+
+Pemeriksaan revisi Tutorial 3 menjalankan `python manage.py check`, `python manage.py makemigrations --check --dry-run`, dan `python manage.py test`. Hasilnya 22 test lulus. Halaman `/projects/` dan `/projects/add/` juga diperiksa pada browser lokal untuk memastikan title tidak ganda dan tidak ada scroll horizontal pada viewport sekitar 639 piksel.
+
 ## Dokumentasi Penggunaan AI
 
 ### Catatan Tugas 1
@@ -174,7 +186,7 @@ AI membantu menjelaskan konsep dan memberi contoh umum, tetapi contoh tersebut t
 
 Pengembangan Tugas 2 dibantu ChatGPT melalui Web. Bantuan mencakup pembacaan checklist tugas dan CV, peninjauan portofolio lama, implementasi model/view/template/migrasi, penataan CSS, penulisan test, serta draf dokumentasi dan jawaban reflektif. Jadi, bantuan pada tahap ini bukan hanya diskusi konsep. Pembahasan kemudian dilanjutkan melalui AI Web ChatGPT untuk menguji pemahaman tentang alur MVT, rancangan model, routing, unit test, dan jawaban reflektif. Prompt diawali dengan analisis dan kesulitan yang saya alami, kemudian meminta kritik atau pertanyaan pemandu, bukan kode website siap pakai.
 
-Tautan percakapan Tugas 2: [AI Web ChatGPT - Tugas 2](https://chatgpt.com/share/6aa3d34a-0698-83ec-85e1-739a8085dbfa)
+Tautan percakapan Tugas 2: [AI Web ChatGPT - Tugas 2](https://chatgpt.com/share/6aa3d20a-9c40-83ec-b83c-6f973f820a62)
 
 Log ringkas permintaan dan keputusan sesi ini:
 
