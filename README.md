@@ -172,7 +172,7 @@ AI membantu menjelaskan konsep dan memberi contoh umum, tetapi contoh tersebut t
 
 ### Catatan Tugas 2
 
-Pengembangan Tugas 2 dibantu ChatGPT melalui Codex. Bantuan mencakup pembacaan checklist tugas dan CV, peninjauan portofolio lama, implementasi model/view/template/migrasi, penataan CSS, penulisan test, serta draf dokumentasi dan jawaban reflektif. Jadi, bantuan pada tahap ini bukan hanya diskusi konsep. Pembahasan kemudian dilanjutkan melalui AI Web ChatGPT untuk menguji pemahaman tentang alur MVT, rancangan model, routing, unit test, dan jawaban reflektif. Prompt diawali dengan analisis dan kesulitan yang saya alami, kemudian meminta kritik atau pertanyaan pemandu, bukan kode website siap pakai.
+Pengembangan Tugas 2 dibantu ChatGPT melalui Web. Bantuan mencakup pembacaan checklist tugas dan CV, peninjauan portofolio lama, implementasi model/view/template/migrasi, penataan CSS, penulisan test, serta draf dokumentasi dan jawaban reflektif. Jadi, bantuan pada tahap ini bukan hanya diskusi konsep. Pembahasan kemudian dilanjutkan melalui AI Web ChatGPT untuk menguji pemahaman tentang alur MVT, rancangan model, routing, unit test, dan jawaban reflektif. Prompt diawali dengan analisis dan kesulitan yang saya alami, kemudian meminta kritik atau pertanyaan pemandu, bukan kode website siap pakai.
 
 Tautan percakapan Tugas 2: [AI Web ChatGPT - Tugas 2](https://chatgpt.com/share/6aa3d34a-0698-83ec-85e1-739a8085dbfa)
 

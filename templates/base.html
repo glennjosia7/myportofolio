@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block meta %}{% endblock meta %}
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
@@ -20,6 +21,7 @@
                 <a href="{% url 'main:show_main' %}"{% if request.resolver_match.url_name == 'show_main' %} aria-current="page"{% endif %}>Profile</a>
                 <a href="{% url 'main:show_experience' %}"{% if request.resolver_match.url_name == 'show_experience' %} aria-current="page"{% endif %}>Experience</a>
                 <a href="{% url 'main:show_achievements' %}"{% if request.resolver_match.url_name == 'show_achievements' %} aria-current="page"{% endif %}>Achievements</a>
+                <a href="{% url 'main:show_projects' %}"{% if request.resolver_match.url_name == 'show_projects' %} aria-current="page"{% endif %}>Projects</a>
             </nav>
         </div>
     </header>
