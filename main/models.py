@@ -51,3 +51,15 @@ class Project(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Certification(models.Model):
+    name = models.CharField(max_length=255)
+    issuing_organization = models.CharField(max_length=255)
+    issue_date = models.DateField()
+    expiration_date = models.DateField(blank=True, null=True)
+    credential_id = models.CharField(max_length=255)
+    credential_url = models.URLField()
+
+    def __str__(self):
+        return self.name

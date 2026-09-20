@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Certifications - {{ name }}{% endblock %}
+
+{% block content %}
+<section class="page-section container" id="certifications" aria-labelledby="certifications-title">
+    <header class="page-heading">
+        <div class="section-heading-row">
+            <div>
+                <p class="section-kicker">Credentials &amp; licenses</p>
+                <h1 id="certifications-title">Certifications<span class="accent">.</span></h1>
+            </div>
+            <a href="{% url 'main:create_certification' %}" class="button">Add Certification</a>
+        </div>
+        <p class="page-intro">A record of certifications and credentials.</p>
+    </header>
+
+    <div class="certification-grid">
+        {% for certification in certification_list %}
+            <article class="certification-card">
+                <div>
+                    <p class="certification-organization">{{ certification.issuing_organization }}</p>
+                    <h2>{{ certification.name }}</h2>
+                </div>
+
+                <dl class="certification-details">
+                    <div>
+                        <dt>Issued</dt>
+                        <dd><time datetime="{{ certification.issue_date|date:'Y-m-d' }}">{{ certification.issue_date|date:'M Y' }}</time></dd>
+                    </div>
+                    <div>
+                        <dt>Expires</dt>
+                        <dd>
+                            {% if certification.expiration_date %}
+                                <time datetime="{{ certification.expiration_date|date:'Y-m-d' }}">{{ certification.expiration_date|date:'M Y' }}</time>
+                            {% else %}
+                                No expiration
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+
+                <p class="certification-credential"><strong>Credential ID:</strong> {{ certification.credential_id }}</p>
+                <div class="certification-card__actions">
+                    <a href="{{ certification.credential_url }}" class="button" target="_blank" rel="noopener">Verify Credential</a>
+                    <a href="{% url 'main:update_certification' certification.id %}" class="button button-secondary">Edit</a>
+                    <form method="post" action="{% url 'main:delete_certification' certification.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="button button-danger">Delete</button>
+                    </form>
+                </div>
+            </article>
+        {% empty %}
+            <p class="empty-state">No certifications added yet.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock content %}

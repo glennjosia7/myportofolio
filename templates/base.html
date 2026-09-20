@@ -22,6 +22,7 @@
                 <a href="{% url 'main:show_experience' %}"{% if request.resolver_match.url_name == 'show_experience' %} aria-current="page"{% endif %}>Experience</a>
                 <a href="{% url 'main:show_achievements' %}"{% if request.resolver_match.url_name == 'show_achievements' %} aria-current="page"{% endif %}>Achievements</a>
                 <a href="{% url 'main:show_projects' %}"{% if request.resolver_match.url_name == 'show_projects' %} aria-current="page"{% endif %}>Projects</a>
+                <a href="{% url 'main:show_certifications' %}"{% if request.resolver_match.url_name == 'show_certifications' or request.resolver_match.url_name == 'create_certification' or request.resolver_match.url_name == 'update_certification' %} aria-current="page"{% endif %}>Certification</a>
             </nav>
         </div>
     </header>

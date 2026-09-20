@@ -51,4 +51,4 @@ env.bak/
 venv.bak/
 
 # OS
-.DS_Store
+.DS_Store.serena/

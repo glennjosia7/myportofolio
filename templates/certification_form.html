@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} - {{ name }}{% endblock %}
+
+{% block content %}
+<section class="page-section container" aria-labelledby="certification-form-title">
+    <header class="page-heading">
+        <p class="section-kicker">Credentials &amp; licenses</p>
+        <h1 id="certification-form-title">{{ form_title }}<span class="accent">.</span></h1>
+    </header>
+
+    <form method="post" class="project-form certification-form">
+        {% csrf_token %}
+        {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}
+                    <p class="form-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endfor %}
+        <button type="submit" class="button">{{ submit_label }}</button>
+        <a href="{% url 'main:show_certifications' %}" class="button button-secondary">Cancel</a>
+    </form>
+</section>
+{% endblock content %}

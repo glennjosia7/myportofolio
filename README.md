@@ -15,6 +15,7 @@ Website portofolio pribadi dengan halaman Profile, Experience, Achievements, dan
 - Halaman Achievements berisi lima hasil kompetisi CTF dari database dan bukti masing-masing.
 - Halaman utama memuat preview Experience dan Achievement dengan tautan menuju halaman lengkap.
 - Halaman Projects dengan form tambah data, pencarian berdasarkan judul, endpoint JSON, dan konfirmasi penghapusan.
+- Halaman Certifications dengan form tambah/edit, penghapusan data, dan endpoint JSON.
 - Navbar transparan dengan blur, tetap di atas saat di-scroll, dan penanda halaman aktif.
 - Navbar dan footer bersama melalui template inheritance Django.
 - Tampilan responsif untuk layar desktop, tablet, dan perangkat seluler.
@@ -43,16 +44,16 @@ Buka `http://127.0.0.1:8000/` pada browser setelah server berjalan.
 
 Perintah `loaddata experiences achievements` mengisi tiga pengalaman dan lima prestasi dari fixture JSON. Jalankan saat pertama menyiapkan database. Menjalankannya ulang akan mengembalikan objek dengan ID yang sama ke isi fixture, termasuk menimpa perubahan pada objek tersebut.
 
-Untuk mengelola data tanpa mengedit HTML, jalankan `python manage.py createsuperuser`, lalu masuk ke `/admin/`. Model Achievement, Experience, dan Project sudah terdaftar. Pada deskripsi Experience, satu baris teks akan ditampilkan sebagai satu poin. Field `logo` menyimpan path static untuk logo COMPFEST, RISTEK, dan Open House Fasilkom UI 2025. Data Project dapat ditambahkan melalui `/projects/add/`. Jangan bagikan kredensial admin atau berkas `.env`.
+Untuk mengelola data tanpa mengedit HTML, jalankan `python manage.py createsuperuser`, lalu masuk ke `/admin/`. Model Achievement, Experience, Project, dan Certification sudah terdaftar. Pada deskripsi Experience, satu baris teks akan ditampilkan sebagai satu poin. Field `logo` menyimpan path static untuk logo COMPFEST, RISTEK, dan Open House Fasilkom UI 2025. Data Project dapat ditambahkan melalui `/projects/add/`, sedangkan Certification dapat ditambah atau diubah melalui halaman `/certifications/`. Jangan bagikan kredensial admin atau berkas `.env`.
 
 Untuk database di PWS, migrasi dan pengisian data perlu dijalankan di lingkungan PWS juga; isi SQLite lokal tidak ikut terkirim melalui Git. Pengembangan ini belum di-deploy ulang.
 
 ## Alur Sederhana Aplikasi
 
 1. `portofolio/urls.py` menerima pola URL dan meneruskannya ke `main/urls.py` melalui `include`.
-2. `/` memanggil `show_main`, `/experience/` memanggil `show_experience`, `/achievements/` memanggil `show_achievements`, dan `/projects/` memanggil `show_projects`.
-3. View menyiapkan context. View Experience dan Achievements mengambil QuerySet, sedangkan View Projects mengambil response JSON lalu melakukan deserialize.
-4. Template halaman mengisi blok pada `templates/base.html`. Daftar data ditampilkan melalui `{% for %}`, dengan `{% empty %}` untuk database kosong. Form Project memakai `ProjectForm`, sedangkan penghapusan memakai request `POST` dengan CSRF token.
+2. `/` memanggil `show_main`, `/experience/` memanggil `show_experience`, `/achievements/` memanggil `show_achievements`, `/projects/` memanggil `show_projects`, dan `/certifications/` memanggil `show_certifications`.
+3. View menyiapkan context. View Experience dan Achievements mengambil QuerySet, sedangkan View Projects dan Certifications mengambil response JSON lalu melakukan deserialize.
+4. Template halaman mengisi blok pada `templates/base.html`. Daftar data ditampilkan melalui `{% for %}`, dengan `{% empty %}` untuk database kosong. Form Project memakai `ProjectForm`, sedangkan form Certification memakai `CertificationForm`. Perubahan dan penghapusan data menggunakan request `POST` dengan CSRF token.
 5. Browser menerima HTML dan memuat stylesheet serta foto dari static files.
 
 Bagian yang perlu dikenali untuk melanjutkan proyek:
@@ -63,6 +64,7 @@ Bagian yang perlu dikenali untuk melanjutkan proyek:
 | Menambah field prestasi | `main/models.py`, kemudian `makemigrations` dan `migrate` |
 | Mengubah urutan daftar | `order_by()` di `main/views.py` |
 | Mengubah susunan hasil, judul, penyelenggara, tahun, dan bukti | model/data Achievement dan `templates/achievements.html` |
+| Mengubah field atau tampilan Certification | `main/models.py`, `main/forms.py`, dan `templates/certifications.html` |
 | Menambah tautan navbar atau mengubah footer | `templates/base.html` |
 | Mengubah warna, jarak, dan layout mobile | `static/css/style.css` |
 
@@ -164,7 +166,41 @@ Arah hero mempertahankan [portofolio sebelumnya](https://portofolio-website-sand
 - Mengubah `show_projects` agar membaca response JSON dan melakukan deserialize sebelum merender template.
 - Menambahkan penghapusan Project melalui request `POST` dengan CSRF token dan konfirmasi popover.
 
-Pemeriksaan revisi Tutorial 3 menjalankan `python manage.py check`, `python manage.py makemigrations --check --dry-run`, dan `python manage.py test`. Hasilnya 22 test lulus. Halaman `/projects/` dan `/projects/add/` juga diperiksa pada browser lokal untuk memastikan title tidak ganda dan tidak ada scroll horizontal pada viewport sekitar 639 piksel.
+Pemeriksaan revisi Tutorial 3 menjalankan `python manage.py check`, `python manage.py makemigrations --check --dry-run`, dan `python manage.py test`. Pemeriksaan ini menghasilkan 28 test lulus setelah fitur Certification ditambahkan. Halaman `/projects/`, `/projects/add/`, `/certifications/`, dan `/certifications/add/` juga diperiksa pada browser lokal untuk memastikan title tidak ganda, input tanggal memakai tipe date, dan tidak ada scroll horizontal.
+
+### Tugas 3
+
+Fitur baru yang dibuat adalah halaman Certification. Data Certification disimpan pada model Django dan dapat dikelola melalui halaman web dengan operasi create, update, dan delete. Halaman daftar menggunakan data dari endpoint JSON, kemudian melakukan deserialisasi sebelum data dikirim ke template.
+
+1. **Mengapa menggunakan ModelForm daripada membuat form HTML secara manual?**
+
+   ModelForm menghubungkan field pada form dengan field pada model. Django dapat membuat input, melakukan validasi dasar, dan menyimpan data melalui `form.save()`. Dengan form HTML manual, saya perlu menulis ulang field, membaca setiap nilai dari `request.POST`, melakukan validasi, lalu membuat atau memperbarui object sendiri. ModelForm membuat alur tersebut lebih singkat dan menjaga aturan form tetap mengikuti model.
+
+   `csrf_token` diperlukan pada form yang mengirim request `POST`. Token ini dibuat oleh server dan dikirim bersama form. Django memeriksa token tersebut sebelum menerima perubahan, sehingga website lain tidak dapat dengan mudah membuat browser pengguna mengirim request perubahan tanpa persetujuan yang sah.
+
+2. **Mengapa JSON lebih sering digunakan daripada XML pada aplikasi web modern?**
+
+   JSON memiliki bentuk yang lebih ringkas dan langsung cocok dengan object serta array yang digunakan JavaScript. Parser JSON juga tersedia di banyak bahasa pemrograman, sehingga pertukaran data antara backend dan frontend lebih sederhana. XML tetap berguna pada sistem tertentu, tetapi biasanya membutuhkan tag pembuka dan penutup yang membuat payload lebih panjang untuk data yang sama.
+
+3. **Bagaimana alur JSON serialization pada halaman Certification?**
+
+   Saat `/certifications/` dibuka, routing proyek meneruskan request ke `main/urls.py`, lalu route tersebut memanggil `show_certifications`. View memanggil endpoint `get_certifications_json`, mengambil seluruh object Certification, dan mengubahnya menjadi JSON menggunakan `serializers.serialize()`. JSON dikembalikan sebagai `HttpResponse` dengan `content_type="application/json"`.
+
+   Setelah itu, `show_certifications` membaca isi response JSON dan menggunakan `serializers.deserialize()` untuk mengubahnya kembali menjadi object Python. Object tersebut dimasukkan ke context dan dirender oleh `certifications.html`. Serialization diperlukan karena object model Django tidak dapat dikirim langsung sebagai data JSON melalui HTTP; object harus diubah dulu menjadi format data yang dapat dipahami client.
+
+#### AI Disclosure
+
+Dalam pengerjaan Tugas 3, saya menggunakan bantuan AI Website sebagai alat pendukung pembelajaran dan pengembangan kode.
+
+AI Website digunakan untuk:
+
+- membantu memahami implementasi Django ModelForm;
+- membantu menyusun alur CRUD Certification;
+- membantu memeriksa hubungan antara model, form, view, URL, dan template;
+- membantu debugging error saat menjalankan test dan server;
+- memberikan masukan terhadap struktur kode dan dokumentasi.
+
+Saya tetap membaca ketentuan tugas, memeriksa struktur repository, menyesuaikan kode dengan pola Project yang sudah ada, dan menjalankan test secara manual. Kode tidak langsung diterima sebagai hasil otomatis; setiap bagian diperiksa kembali agar sesuai dengan fitur yang benar-benar digunakan.
 
 ## Dokumentasi Penggunaan AI
 

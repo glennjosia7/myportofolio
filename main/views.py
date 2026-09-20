@@ -3,8 +3,8 @@ from django.core import serializers
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from main.forms import ProjectForm
-from main.models import Achievement, Experience, Project
+from main.forms import CertificationForm, ProjectForm
+from main.models import Achievement, Certification, Experience, Project
 
 
 def show_main(request):
@@ -92,3 +92,69 @@ def delete_project(request, project_id):
         return redirect("main:show_projects")
 
     return redirect("main:show_projects")
+
+
+def get_certifications_json(request):
+    certifications = Certification.objects.order_by("-issue_date", "name")
+    certifications_json = serializers.serialize("json", certifications)
+    return HttpResponse(certifications_json, content_type="application/json")
+
+
+def show_certifications(request):
+    json_response = get_certifications_json(request)
+    certifications = serializers.deserialize(
+        "json",
+        json_response.content.decode("utf-8"),
+    )
+    certifications = [item.object for item in certifications]
+
+    context = {
+        "name": "Glenn Josia Devano",
+        "certification_list": certifications,
+    }
+    return render(request, "certifications.html", context)
+
+
+def create_certification(request):
+    form = CertificationForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Certification berhasil ditambahkan!")
+        return redirect("main:show_certifications")
+
+    context = {
+        "name": "Glenn Josia Devano",
+        "form": form,
+        "form_title": "Add Certification",
+        "submit_label": "Add Certification",
+    }
+    return render(request, "certification_form.html", context)
+
+
+def update_certification(request, certification_id):
+    certification = get_object_or_404(Certification, pk=certification_id)
+    form = CertificationForm(request.POST or None, instance=certification)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Certification berhasil diperbarui!")
+        return redirect("main:show_certifications")
+
+    context = {
+        "name": "Glenn Josia Devano",
+        "form": form,
+        "form_title": "Edit Certification",
+        "submit_label": "Save Changes",
+    }
+    return render(request, "certification_form.html", context)
+
+
+def delete_certification(request, certification_id):
+    certification = get_object_or_404(Certification, pk=certification_id)
+
+    if request.method == "POST":
+        certification.delete()
+        messages.success(request, "Certification berhasil dihapus!")
+
+    return redirect("main:show_certifications")

@@ -1,11 +1,12 @@
 import json
+from datetime import date
 
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from django.contrib.staticfiles import finders
 
-from main.models import Achievement, Experience, Project
+from main.models import Achievement, Certification, Experience, Project
 
 
 class MainTest(TestCase):
@@ -142,7 +143,13 @@ class AchievementTest(TestCase):
         self.assertNotContains(response, "<script>")
 
     def test_shared_navigation_and_footer_on_every_page(self):
-        routes = ["show_main", "show_experience", "show_achievements", "show_projects"]
+        routes = [
+            "show_main",
+            "show_experience",
+            "show_achievements",
+            "show_projects",
+            "show_certifications",
+        ]
         for current in routes:
             with self.subTest(page=current):
                 response = self.client.get(reverse(f"main:{current}"))
@@ -299,3 +306,94 @@ class ProjectTest(TestCase):
         )
         self.assertEqual(post_response.status_code, 302)
         self.assertFalse(Project.objects.filter(pk=self.project.id).exists())
+
+
+class CertificationTest(TestCase):
+    def setUp(self):
+        self.certification = Certification.objects.create(
+            name="Web Security Fundamentals",
+            issuing_organization="Security Academy",
+            issue_date=date(2026, 9, 1),
+            credential_id="SEC-2026-001",
+            credential_url="https://example.com/verify/SEC-2026-001",
+        )
+
+    def test_certifications_page_uses_json_data(self):
+        response = self.client.get(reverse("main:show_certifications"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "certifications.html")
+        self.assertEqual(
+            [item.name for item in response.context["certification_list"]],
+            [self.certification.name],
+        )
+        self.assertContains(response, self.certification.name)
+        self.assertContains(response, self.certification.issuing_organization)
+        self.assertContains(response, "No expiration")
+        self.assertContains(response, "csrfmiddlewaretoken")
+
+    def test_empty_certifications_page(self):
+        Certification.objects.all().delete()
+        response = self.client.get(reverse("main:show_certifications"))
+
+        self.assertContains(response, "No certifications added yet.")
+
+    def test_certifications_json_endpoint(self):
+        response = self.client.get(reverse("main:get_certifications_json"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/json")
+        data = json.loads(response.content)
+        self.assertEqual(data[0]["model"], "main.certification")
+        self.assertEqual(data[0]["fields"]["name"], self.certification.name)
+
+    def test_create_certification_with_form(self):
+        response = self.client.post(
+            reverse("main:create_certification"),
+            {
+                "name": "Python Certificate",
+                "issuing_organization": "Python Institute",
+                "issue_date": "2026-09-02",
+                "expiration_date": "",
+                "credential_id": "PY-001",
+                "credential_url": "https://example.com/verify/PY-001",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Certification.objects.filter(name="Python Certificate").exists())
+        self.assertContains(response, "Certification berhasil ditambahkan!")
+
+    def test_update_certification_with_form(self):
+        response = self.client.post(
+            reverse("main:update_certification", args=[self.certification.id]),
+            {
+                "name": "Updated Web Security Fundamentals",
+                "issuing_organization": "Security Academy",
+                "issue_date": "2026-09-01",
+                "expiration_date": "2028-09-01",
+                "credential_id": self.certification.credential_id,
+                "credential_url": self.certification.credential_url,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.certification.refresh_from_db()
+        self.assertEqual(self.certification.name, "Updated Web Security Fundamentals")
+        self.assertEqual(self.certification.expiration_date, date(2028, 9, 1))
+        self.assertContains(response, "Certification berhasil diperbarui!")
+
+    def test_delete_certification_only_on_post(self):
+        get_response = self.client.get(
+            reverse("main:delete_certification", args=[self.certification.id])
+        )
+        self.assertEqual(get_response.status_code, 302)
+        self.assertTrue(Certification.objects.filter(pk=self.certification.id).exists())
+
+        post_response = self.client.post(
+            reverse("main:delete_certification", args=[self.certification.id])
+        )
+        self.assertEqual(post_response.status_code, 302)
+        self.assertFalse(Certification.objects.filter(pk=self.certification.id).exists())
