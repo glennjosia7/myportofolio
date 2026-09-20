@@ -6,6 +6,7 @@
     --accent: #36c2ae;
     --muted: #a9bbca;
     --line: #27455b;
+    --radius: 10px;
 }
 
 * {
@@ -634,8 +635,13 @@ a:focus-visible {
     .experience-card,
     .achievement-card,
     .evidence-link img,
-    .social-links a {
+    .social-links a,
+    .button {
         transition: none;
+    }
+
+    .button:hover {
+        transform: none;
     }
 }
 
@@ -673,15 +679,39 @@ a:focus-visible {
     border-radius: var(--radius, 10px);
     padding: 0.65rem 1rem;
     background: var(--accent);
-    color: white;
+    color: #ffffff;
     cursor: pointer;
     font: inherit;
     font-weight: 700;
     text-decoration: none;
+    transition: background-color .2s ease, color .2s ease, transform .2s ease;
+}
+
+/* a:hover global memberi warna accent ke semua tautan, sehingga teks pada
+   tautan bertombol menjadi senada dengan latarnya. Aturan di bawah menjaga
+   kontras teks tetap terbaca ketika tombol di-hover. */
+.button:hover {
+    background: #2aa896;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.button:active {
+    transform: translateY(0);
+}
+
+.button:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
 }
 
 .button-secondary {
     background: var(--ink);
+    color: var(--paper);
+}
+
+.button-secondary:hover {
+    background: #c7d3e0;
     color: var(--paper);
 }
 
@@ -724,7 +754,7 @@ a:focus-visible {
 }
 
 .form-error {
-    color: #b42318;
+    color: #ff9b8f;
     font-size: 0.85rem;
     margin-top: 0.35rem;
 }
@@ -753,7 +783,7 @@ a:focus-visible {
     display: block;
     width: 100%;
     height: auto;
-    border: 1px solid black;
+    border: 1px solid var(--line);
     border-radius: var(--radius, 10px);
 }
 
@@ -889,6 +919,11 @@ a:focus-visible {
     font-size: 1.8rem;
     line-height: 1;
     cursor: pointer;
+    transition: color .2s ease;
+}
+
+.project-delete-modal__close:hover {
+    color: var(--ink);
 }
 
 .project-delete-modal__actions {
@@ -900,6 +935,11 @@ a:focus-visible {
 
 .button-danger {
     background: #b42318;
+}
+
+.button-danger:hover {
+    background: #8f1c13;
+    color: #ffffff;
 }
 
 /* Certifications */

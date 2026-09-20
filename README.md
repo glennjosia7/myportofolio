@@ -299,3 +299,5 @@ Fitur baru yang dibuat adalah halaman Certification. Data Certification disimpan
 - `templates/`: `certification_form.html`, `certifications.html`, `projects_form.html`, `project.html`, dan `components/project_delete_modal.html`.
 
 Pemeriksaan revisi Tugas 3 menjalankan `python manage.py check`, `python manage.py makemigrations --check --dry-run`, dan `python manage.py test`. Pemeriksaan ini menghasilkan 30 test lulus. Halaman `/projects/`, `/projects/add/`, `/projects/<id>/update/`, `/certifications/`, `/certifications/add/`, dan `/certifications/<id>/update/` juga diperiksa untuk memastikan title tidak ganda, input tanggal memakai tipe date, dan tidak ada scroll horizontal.
+
+Quality check CSS memastikan teks tombol tetap terbaca saat di-hover. Sebelumnya, aturan global `a:hover { color: var(--accent); }` membuat teks pada tautan bertombol (`<a class="button">`) menjadi sewarna dengan latarnya. Kini `.button:hover`, `.button-secondary:hover`, dan `.button-danger:hover` memiliki warna latar dan teks yang eksplisit sehingga kontras terjaga. Favicon menggunakan `static/img/favicon.png` dan versi resolusi penuh disimpan sebagai `static/img/bear-icon.png`.
