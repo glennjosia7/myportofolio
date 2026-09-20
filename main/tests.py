@@ -294,6 +294,55 @@ class ProjectTest(TestCase):
         self.assertEqual(Project.objects.count(), 1)
         self.assertTrue(response.context["form"].errors)
 
+    def test_update_project_with_form(self):
+        response = self.client.get(
+            reverse("main:update_project", args=[self.project.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "projects_form.html")
+        self.assertContains(response, self.project.title)
+        self.assertNotContains(
+            response,
+            f'action="{reverse("main:create_project")}"',
+        )
+
+        response = self.client.post(
+            reverse("main:update_project", args=[self.project.id]),
+            {
+                "title": "Updated Portfolio Website",
+                "description": self.project.description,
+                "tech_stack": self.project.tech_stack,
+                "project_url": self.project.project_url,
+                "project_image_url": "",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.title, "Updated Portfolio Website")
+        self.assertContains(response, "Proyek berhasil diperbarui!")
+
+    def test_update_project_rejects_invalid_form(self):
+        response = self.client.post(
+            reverse("main:update_project", args=[self.project.id]),
+            {
+                "title": "",
+                "description": "",
+                "tech_stack": "",
+                "project_url": "",
+                "project_image_url": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "projects_form.html")
+        self.assertEqual(Project.objects.count(), 1)
+        self.assertTrue(response.context["form"].errors)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.title, "Portfolio Website")
+
     def test_delete_project_requires_post(self):
         get_response = self.client.get(
             reverse("main:delete_project", args=[self.project.id])

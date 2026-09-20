@@ -51,4 +51,8 @@ env.bak/
 venv.bak/
 
 # OS
-.DS_Store.serena/
+.DS_Store
+Thumbs.db
+
+# Serena MCP workspace cache
+.serena/

@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#071525">
     <title>{% block title %}{{ name }} - Portfolio{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'img/profile.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
@@ -21,7 +22,7 @@
                 <a href="{% url 'main:show_main' %}"{% if request.resolver_match.url_name == 'show_main' %} aria-current="page"{% endif %}>Profile</a>
                 <a href="{% url 'main:show_experience' %}"{% if request.resolver_match.url_name == 'show_experience' %} aria-current="page"{% endif %}>Experience</a>
                 <a href="{% url 'main:show_achievements' %}"{% if request.resolver_match.url_name == 'show_achievements' %} aria-current="page"{% endif %}>Achievements</a>
-                <a href="{% url 'main:show_projects' %}"{% if request.resolver_match.url_name == 'show_projects' %} aria-current="page"{% endif %}>Projects</a>
+                <a href="{% url 'main:show_projects' %}"{% if request.resolver_match.url_name == 'show_projects' or request.resolver_match.url_name == 'create_project' or request.resolver_match.url_name == 'update_project' %} aria-current="page"{% endif %}>Projects</a>
                 <a href="{% url 'main:show_certifications' %}"{% if request.resolver_match.url_name == 'show_certifications' or request.resolver_match.url_name == 'create_certification' or request.resolver_match.url_name == 'update_certification' %} aria-current="page"{% endif %}>Certification</a>
             </nav>
         </div>
