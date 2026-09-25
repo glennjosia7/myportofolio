@@ -1,6 +1,7 @@
 import json
 from datetime import date
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -216,6 +217,13 @@ class ExperienceFixtureTest(TestCase):
 
 class ProjectTest(TestCase):
     def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="owner", password="ownerpass123"
+        )
+        self.user = User.objects.create_user(
+            username="visitor", password="visitorpass123"
+        )
+        self.client.force_login(self.admin)
         self.project = Project.objects.create(
             title="Portfolio Website",
             description="A personal portfolio built with Django.",
@@ -356,6 +364,73 @@ class ProjectTest(TestCase):
         self.assertEqual(post_response.status_code, 302)
         self.assertFalse(Project.objects.filter(pk=self.project.id).exists())
 
+    def test_project_writes_require_login(self):
+        self.client.logout()
+
+        for url in [
+            reverse("main:create_project"),
+            reverse("main:update_project", args=[self.project.id]),
+            reverse("main:delete_project", args=[self.project.id]),
+        ]:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.url.startswith(reverse("main:login")))
+
+    def test_project_writes_forbidden_for_regular_user(self):
+        self.client.force_login(self.user)
+
+        for url in [
+            reverse("main:create_project"),
+            reverse("main:update_project", args=[self.project.id]),
+            reverse("main:delete_project", args=[self.project.id]),
+        ]:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 403)
+
+    def test_project_write_controls_only_for_superuser(self):
+        owner_response = self.client.get(reverse("main:show_projects"))
+        self.assertContains(owner_response, reverse("main:create_project"))
+        self.assertContains(
+            owner_response,
+            reverse("main:update_project", args=[self.project.id]),
+        )
+
+        self.client.force_login(self.user)
+        viewer_response = self.client.get(reverse("main:show_projects"))
+        self.assertNotContains(viewer_response, "Tambah Proyek")
+        self.assertNotContains(
+            viewer_response,
+            reverse("main:update_project", args=[self.project.id]),
+        )
+
+    def test_toggle_star_adds_and_removes(self):
+        star_url = reverse("main:toggle_star", args=[self.project.id])
+        self.client.force_login(self.user)
+
+        self.client.post(star_url)
+        self.assertIn(self.user, self.project.starred_by.all())
+
+        self.client.post(star_url)
+        self.assertNotIn(self.user, self.project.starred_by.all())
+
+    def test_toggle_star_requires_login(self):
+        star_url = reverse("main:toggle_star", args=[self.project.id])
+        self.client.logout()
+
+        response = self.client.post(star_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("main:login")))
+        self.assertEqual(self.project.starred_by.count(), 0)
+
+    def test_projects_json_uses_natural_keys_for_stars(self):
+        self.project.starred_by.add(self.user)
+        response = self.client.get(reverse("main:get_projects_json"))
+        data = json.loads(response.content)
+
+        self.assertEqual(data[0]["fields"]["starred_by"], [["visitor"]])
+
 
 class CertificationTest(TestCase):
     def setUp(self):
@@ -446,3 +521,99 @@ class CertificationTest(TestCase):
         )
         self.assertEqual(post_response.status_code, 302)
         self.assertFalse(Certification.objects.filter(pk=self.certification.id).exists())
+
+
+class AuthenticationTest(TestCase):
+    def test_register_creates_account_and_redirects_to_login(self):
+        response = self.client.get(reverse("main:register"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "register.html")
+
+        response = self.client.post(
+            reverse("main:register"),
+            {
+                "username": "newcomer",
+                "password1": "a-very-strong-pass-123",
+                "password2": "a-very-strong-pass-123",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(User.objects.filter(username="newcomer").exists())
+        self.assertContains(response, "Akun berhasil dibuat. Silakan login.")
+
+    def test_register_rejects_mismatched_passwords(self):
+        response = self.client.post(
+            reverse("main:register"),
+            {
+                "username": "newcomer",
+                "password1": "a-very-strong-pass-123",
+                "password2": "different-pass-123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(User.objects.filter(username="newcomer").exists())
+        self.assertTrue(response.context["form"].errors)
+
+    def test_login_sets_session_and_last_login_cookie(self):
+        User.objects.create_user(username="visitor", password="visitorpass123")
+
+        response = self.client.post(
+            reverse("main:login"),
+            {"username": "visitor", "password": "visitorpass123"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("main:show_main"))
+        self.assertIn("sessionid", response.cookies)
+        self.assertIn("last_login", response.cookies)
+
+    def test_login_rejects_wrong_password(self):
+        User.objects.create_user(username="visitor", password="visitorpass123")
+
+        response = self.client.post(
+            reverse("main:login"),
+            {"username": "visitor", "password": "wrong-pass"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors)
+        self.assertNotIn("sessionid", response.cookies)
+
+    def test_main_shows_last_login_cookie(self):
+        self.client.cookies["last_login"] = "2026-09-20 10:30:00"
+
+        response = self.client.get(reverse("main:show_main"))
+
+        self.assertContains(response, "2026-09-20 10:30:00")
+
+    def test_main_without_cookie_shows_default(self):
+        response = self.client.get(reverse("main:show_main"))
+
+        self.assertContains(response, "Belum ada sesi login")
+
+    def test_logout_clears_session_and_last_login_cookie(self):
+        User.objects.create_user(username="visitor", password="visitorpass123")
+        self.client.login(username="visitor", password="visitorpass123")
+        self.client.cookies["last_login"] = "2026-09-20 10:30:00"
+
+        response = self.client.get(reverse("main:logout"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.cookies["last_login"].value, "")
+
+        home = self.client.get(reverse("main:show_main"))
+        self.assertContains(home, reverse("main:login"))
+        self.assertContains(home, reverse("main:register"))
+
+    def test_navbar_shows_username_when_logged_in(self):
+        User.objects.create_user(username="visitor", password="visitorpass123")
+        self.client.login(username="visitor", password="visitorpass123")
+
+        response = self.client.get(reverse("main:show_main"))
+
+        self.assertContains(response, '<span class="nav-user">visitor</span>')
+        self.assertContains(response, reverse("main:logout"))

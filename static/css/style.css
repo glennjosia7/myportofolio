@@ -130,6 +130,13 @@ a:focus-visible {
     border-bottom-color: var(--accent);
 }
 
+.nav-user {
+    padding-block: .7rem;
+    color: var(--accent);
+    font-size: .9rem;
+    font-weight: 700;
+}
+
 /* Profile */
 .hero {
     padding-block: clamp(3rem, 8vw, 7rem);
@@ -759,6 +766,12 @@ a:focus-visible {
     margin-top: 0.35rem;
 }
 
+.form-help {
+    margin-top: 0.35rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
 /* projects */
 
 .project-header {
@@ -940,6 +953,41 @@ a:focus-visible {
 .button-danger:hover {
     background: #8f1c13;
     color: #ffffff;
+}
+
+/* Star pada Project */
+.star-form {
+    display: inline;
+}
+
+.button-star {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--ink);
+    color: var(--paper);
+}
+
+.button-star:hover {
+    background: #c7d3e0;
+    color: var(--paper);
+}
+
+.button-star.is-starred {
+    background: var(--accent);
+    color: #ffffff;
+}
+
+.button-star.is-starred:hover {
+    background: #2aa896;
+    color: #ffffff;
+}
+
+.star-count {
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.25);
+    font-size: 0.8rem;
 }
 
 /* Certifications */
