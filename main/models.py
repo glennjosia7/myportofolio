@@ -65,6 +65,10 @@ class Certification(models.Model):
     expiration_date = models.DateField(blank=True, null=True)
     credential_id = models.CharField(max_length=255)
     credential_url = models.URLField()
+    # Satu certification bisa di-star banyak pengguna, dan sebaliknya.
+    starred_by = models.ManyToManyField(
+        User, related_name="starred_certifications", blank=True
+    )
 
     def __str__(self):
         return self.name

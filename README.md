@@ -4,7 +4,9 @@
 
 Website portofolio pribadi berbasis Django milik Glenn Josia Devano. Project ini menampilkan Profile, Experience, Achievements, Projects, dan Certifications, serta menyediakan operasi Create, Update, Delete, dan JSON Data Delivery untuk bagian data pilihan (Certifications dan Projects).
 
-Project ini merupakan hasil pengerjaan Tutorial 0 sampai Tutorial 3 serta Tugas 1, Tugas 2, dan Tugas 3 pada mata kuliah Pemrograman Berbasis Platform (CSGE602022), Program Studi S1 Sistem Informasi, Universitas Indonesia.
+Situs juga dilengkapi autentikasi (register, login, logout), session dan cookie `last_login`, otorisasi berbasis peran (pengunjung, pengguna biasa, Editor, dan pemilik), serta fitur star pada Projects dan Certifications.
+
+Project ini merupakan hasil pengerjaan Tutorial 0 sampai Tutorial 4 serta Tugas 1, Tugas 2, Tugas 3, dan Tugas 4 pada mata kuliah Pemrograman Berbasis Platform (CSGE602022), Program Studi S1 Sistem Informasi, Universitas Indonesia.
 
 | Identitas | |
 | --- | --- |
@@ -21,7 +23,11 @@ Project ini merupakan hasil pengerjaan Tutorial 0 sampai Tutorial 3 serta Tugas 
 - Halaman utama memuat preview Experience dan Achievement dengan tautan menuju halaman lengkap.
 - Halaman Projects dengan Create, Update, Delete, pencarian berdasarkan judul, dan endpoint JSON.
 - Halaman Certifications dengan Create, Update, Delete, dan endpoint JSON.
-- JSON Data Delivery melalui `django.core.serializers`, lalu deserialisasi sebelum dirender ke template.
+- Registrasi, login, dan logout memakai sistem autentikasi bawaan Django, serta status login pada navbar.
+- Session dan cookie `last_login` yang di-set saat login dan dihapus saat logout.
+- Otorisasi berbasis peran: pengunjung (baca), pengguna biasa (baca + star), Editor (update), dan pemilik/superuser (create, update, delete).
+- Fitur star pada Projects dan Certifications (maksimal satu star per pengguna) dengan jumlah star dan status pengguna.
+- JSON Data Delivery melalui `django.core.serializers`, lalu deserialisasi sebelum dirender ke template; relasi star memakai natural key (username) agar id internal tidak bocor.
 - Navbar transparan dengan blur, tetap di atas saat di-scroll, dan penanda halaman aktif.
 - Navbar dan footer bersama melalui template inheritance Django (`base.html`).
 - Form berbasis ModelForm dengan validasi Django dan proteksi CSRF pada setiap request POST.
@@ -144,6 +150,56 @@ Tugas 3 berfokus pada Form dan Data Delivery. Fitur utama yang dikembangkan adal
 
 Serialization diperlukan karena objek model Django tidak dapat dikirim langsung sebagai data JSON melalui HTTP. Objek harus diubah lebih dulu menjadi format data yang dapat dipahami client, lalu dideserialisasi bila backend ingin memakainya kembali sebagai objek. Pola yang sama dipakai untuk Projects pada `show_projects` dan `get_projects_json`.
 
+# Tugas 4 Implementation
+
+Tugas 4 menerapkan pola autentikasi dan otorisasi dari Tutorial 4 pada bagian yang dibuat di Tugas 3, yaitu **Certifications**, lalu menambahkan peran baru **Editor** dan fitur star.
+
+## Matriks hak akses
+
+| Peran | Membaca | Memberi star | Mengubah (update) | Membuat / menghapus |
+| --- | --- | --- | --- | --- |
+| Pengunjung (belum login) | Ya | Tidak | Tidak | Tidak |
+| Pengguna biasa | Ya | Ya | Tidak | Tidak |
+| Editor | Ya | Ya | Ya | Tidak |
+| Pemilik (superuser) | Ya | Ya | Ya | Ya |
+
+Batasan diterapkan di sisi server, bukan hanya di tampilan:
+
+- `@login_required(login_url="/login/")` mengalihkan pengunjung tanpa login ke halaman login dengan parameter `?next=`.
+- `request.user.has_perm("main.add_certification")`, `"main.change_certification"`, dan `"main.delete_certification"` menentukan izin. Bila tidak berhak, view melempar `PermissionDenied` sehingga Django membalas `403 Forbidden`.
+- Superuser otomatis memiliki semua permission, sehingga tidak perlu pemeriksaan `is_superuser` terpisah pada Certification.
+
+## Peran Editor melalui Django Group
+
+Grup `Editor` dibuat melalui Django Admin dan diberi permission **`Main | certification | Can change certification`**.
+
+1. Jalankan `python manage.py createsuperuser`, lalu buka `/admin/`.
+2. Authentication and Authorization → Groups → Add group. Nama: `Editor`.
+3. Pada daftar permission, pilih `Main → certification → Can change certification`. Simpan.
+4. Authentication and Authorization → Users, buka akun yang ingin dijadikan editor, tambahkan ke grup `Editor`. Simpan.
+
+Akun di grup `Editor` dapat membuka form update (HTTP 200) tetapi tetap mendapat `403 Forbidden` pada create dan delete.
+
+## Penyembunyian kontrol di template
+
+`templates/certifications.html` memakai objek `perms` bawaan Django:
+
+- `{% if perms.main.add_certification %}` untuk tombol **Add Certification**;
+- `{% if perms.main.change_certification %}` untuk tombol **Edit**;
+- `{% if perms.main.delete_certification %}` untuk tombol **Delete**.
+
+Penyembunyian di template hanya mengatur tampilan. Penolakan sebenarnya tetap dilakukan oleh decorator dan pemeriksaan permission di view.
+
+## Fitur star
+
+- Model `Certification` memiliki `starred_by = models.ManyToManyField(User, related_name="starred_certifications", blank=True)` (migrasi `0009_certification_starred_by`). Model `Project` memakai pola yang sama dengan `related_name="starred_projects"`.
+- View `toggle_star_certification` (POST + `{% csrf_token %}`) menambahkan atau menghapus satu baris relasi. Karena memakai `ManyToManyField`, satu pengguna hanya bisa memberi satu star per certification.
+- Komponen `templates/components/certification_star.html` menampilkan jumlah star (`starred_by.count`) dan status pengguna (`Star` atau `Unstar`). Pengunjung tanpa login tetap melihat tombolnya, tetapi klik akan dialihkan ke halaman login.
+
+## Integritas API
+
+Endpoint `/certifications/json/` dan `/api/projects/` memakai `serializers.serialize(..., use_natural_foreign_keys=True)`, sehingga daftar pemberi star muncul sebagai username, bukan id internal database. Contoh: `"starred_by": [["glenn"]]`. Tidak ada password atau email yang ikut terserialisasi.
+
 # Testing
 
 ```powershell
@@ -152,15 +208,19 @@ python manage.py makemigrations --check --dry-run
 python manage.py test
 ```
 
-Test mencakup URL dan template, pengambilan data dari database, kondisi kosong, tahun opsional, escaping teks HTML, keberadaan file bukti, kesesuaian fixture, konsistensi navigasi, serta seluruh alur Tugas 3:
+Test mencakup URL dan template, pengambilan data dari database, kondisi kosong, tahun opsional, escaping teks HTML, keberadaan file bukti, kesesuaian fixture, konsistensi navigasi, serta seluruh alur Tugas 3 dan Tugas 4:
 
 - create, update, dan delete Project maupun Certification;
 - penolakan form tidak valid;
 - delete hanya berjalan pada request POST;
 - endpoint JSON mengembalikan `Content-Type: application/json` dan field yang benar;
-- halaman daftar menggunakan data hasil deserialisasi JSON.
+- halaman daftar menggunakan data hasil deserialisasi JSON;
+- autentikasi: register, login (cookie `last_login`), logout, dan tampilan navbar;
+- otorisasi Certification: pengunjung dialihkan ke login, pengguna biasa `403`, Editor boleh update tetapi `403` untuk create/delete, pemilik boleh semuanya;
+- penyembunyian tombol aksi sesuai permission pada template;
+- star pada Project dan Certification (tambah, batalkan, maksimal satu per pengguna) serta natural key pada JSON.
 
-Pemeriksaan lokal terakhir pada 20 September 2026: 30 test lulus, `check` tidak menemukan masalah, dan tidak ada perubahan model yang belum memiliki migrasi. Test berjalan di database test terpisah sehingga tidak menghapus data portofolio lokal.
+Pemeriksaan lokal terakhir pada 26 September 2026: 53 test lulus, `check` tidak menemukan masalah, dan tidak ada perubahan model yang belum memiliki migrasi. Alur empat peran (pengunjung, pengguna biasa, Editor, pemilik) juga diperiksa pada browser, termasuk status `403`, penyembunyian tombol, star, dan penghapusan cookie `last_login` saat logout. Test berjalan di database test terpisah sehingga tidak menghapus data portofolio lokal.
 
 # Reflection Questions
 
@@ -192,6 +252,16 @@ Dalam pengerjaan Tugas 3, bantuan AI ChatGPT Web digunakan untuk:
 - membantu debugging error saat menjalankan test dan server;
 - memberikan masukan terhadap struktur kode, README, dan dokumentasi.
 
+Dalam pengerjaan Tugas 4, bantuan **AI ChatGPT Web** (ChatGPT Website) digunakan untuk:
+
+- membantu memahami perbedaan autentikasi dan otorisasi serta penerapan permission Django;
+- membantu merancang peran Editor dengan Django Group dan permission `Main | certification | Can change certification`;
+- membantu memeriksa pemeriksaan hak akses di sisi server dan penyembunyian kontrol di template;
+- membantu meninjau integritas endpoint JSON agar tidak membocorkan id internal atau data sensitif;
+- membantu debugging ketika menjalankan test dan server.
+
+Bagian yang dibantu terutama pada review struktur dan penjelasan konsep. Penentuan peran, penulisan kode, dan pengecekan akhir dilakukan secara manual dengan menjalankan test serta memeriksa alur empat peran di browser.
+
 Pengembang tetap membaca ketentuan tugas, memeriksa struktur repository, menyesuaikan kode dengan pola Project yang sudah ada, dan menjalankan test secara manual. Kode tidak langsung diterima sebagai hasil otomatis; setiap bagian diperiksa kembali agar sesuai dengan fitur yang benar-benar digunakan.
 
 ## Riwayat dan strategi prompting
@@ -199,10 +269,13 @@ Pengembang tetap membaca ketentuan tugas, memeriksa struktur repository, menyesu
 - Percakapan Tugas 1 (AI ChatGPT Web): https://chatgpt.com/share/6a9ae1a1-4fe8-83ec-8d60-b252bab78aec
 - Percakapan Tugas 2 (AI ChatGPT Web): https://chatgpt.com/share/6aa3d20a-9c40-83ec-b83c-6f973f820a62
 - Percakapan Tugas 3 (AI ChatGPT Web): https://chatgpt.com/share/6aaf89fc-ef68-83ec-b16a-6a1e73766bed
+- Percakapan Tugas 4 (AI ChatGPT Web): https://chatgpt.com/share/6ab9d9ae-0eac-83ec-8fcf-61b219ed6618
+
+Log prompt pembelajaran Tugas 4 disimpan di luar repository sebagai catatan pribadi dan tidak di-commit, karena ketentuan tugas tidak mewajibkannya.
 
 # Progres Mingguan
 
-Catatan di bawah menjelaskan kondisi proyek pada minggu terkait, bukan struktur akhir setelah Tugas 3.
+Catatan di bawah menjelaskan kondisi proyek pada minggu terkait, bukan struktur akhir setelah Tugas 4.
 
 ## Tutorial 0
 
@@ -301,3 +374,21 @@ Fitur baru yang dibuat adalah halaman Certification. Data Certification disimpan
 Pemeriksaan revisi Tugas 3 menjalankan `python manage.py check`, `python manage.py makemigrations --check --dry-run`, dan `python manage.py test`. Pemeriksaan ini menghasilkan 30 test lulus. Halaman `/projects/`, `/projects/add/`, `/projects/<id>/update/`, `/certifications/`, `/certifications/add/`, dan `/certifications/<id>/update/` juga diperiksa untuk memastikan title tidak ganda, input tanggal memakai tipe date, dan tidak ada scroll horizontal.
 
 Quality check CSS memastikan teks tombol tetap terbaca saat di-hover. Sebelumnya, aturan global `a:hover { color: var(--accent); }` membuat teks pada tautan bertombol (`<a class="button">`) menjadi sewarna dengan latarnya. Kini `.button:hover`, `.button-secondary:hover`, dan `.button-danger:hover` memiliki warna latar dan teks yang eksplisit sehingga kontras terjaga. Favicon menggunakan `static/img/favicon.png` dan versi resolusi penuh disimpan sebagai `static/img/bear-icon.png`.
+
+## Tutorial 4
+
+- Menambahkan register, login, dan logout memakai `UserCreationForm` dan `AuthenticationForm` bawaan Django.
+- Menampilkan status login pada navbar melalui `base.html`.
+- Menyimpan cookie `last_login` saat login, menampilkannya pada halaman profil, dan menghapusnya saat logout.
+- Membatasi `create_project`, `update_project`, dan `delete_project` dengan `@login_required` dan pemeriksaan `is_superuser`.
+- Menambahkan relasi `starred_by` dan view `toggle_star` pada `Project`, serta menyembunyikan tombol aksi dari pengguna yang tidak berhak.
+
+## Tugas 4
+
+- Menerapkan otorisasi berbasis peran pada `Certification`: pengunjung dialihkan ke login, pengguna biasa `403` pada perubahan data, Editor boleh update, dan pemilik boleh create/update/delete.
+- Menambahkan peran Editor melalui Django Group `Editor` dengan permission `Can change certification`.
+- Menambahkan `starred_by` (`ManyToManyField(User)`) dan `toggle_star_certification` pada `Certification`, beserta jumlah star dan status pengguna di template.
+- Memastikan endpoint JSON Tugas 3 tetap berjalan dan memakai natural key (`username`) agar tidak membocorkan id pengguna.
+- Menambah test otorisasi, star, dan integritas JSON.
+
+Pemeriksaan Tugas 4 pada 26 September 2026: `check` bersih, tidak ada migrasi tertunda, dan 53 test lulus. Alur empat peran juga diperiksa pada browser: pengunjung, pengguna biasa, Editor, dan pemilik, mencakup star, penyembunyian tombol, status `403`, dan cookie `last_login`.

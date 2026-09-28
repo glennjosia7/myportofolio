@@ -142,7 +142,11 @@ def delete_project(request, project_id):
 
 def get_certifications_json(request):
     certifications = Certification.objects.order_by("-issue_date", "name")
-    certifications_json = serializers.serialize("json", certifications)
+    certifications_json = serializers.serialize(
+        "json",
+        certifications,
+        use_natural_foreign_keys=True,
+    )
     return HttpResponse(certifications_json, content_type="application/json")
 
 
@@ -161,7 +165,11 @@ def show_certifications(request):
     return render(request, "certifications.html", context)
 
 
+@login_required(login_url="/login/")
 def create_certification(request):
+    if not request.user.has_perm("main.add_certification"):
+        raise PermissionDenied
+
     form = CertificationForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
@@ -178,7 +186,11 @@ def create_certification(request):
     return render(request, "certification_form.html", context)
 
 
+@login_required(login_url="/login/")
 def update_certification(request, certification_id):
+    if not request.user.has_perm("main.change_certification"):
+        raise PermissionDenied
+
     certification = get_object_or_404(Certification, pk=certification_id)
     form = CertificationForm(request.POST or None, instance=certification)
 
@@ -196,7 +208,11 @@ def update_certification(request, certification_id):
     return render(request, "certification_form.html", context)
 
 
+@login_required(login_url="/login/")
 def delete_certification(request, certification_id):
+    if not request.user.has_perm("main.delete_certification"):
+        raise PermissionDenied
+
     certification = get_object_or_404(Certification, pk=certification_id)
 
     if request.method == "POST":
@@ -260,3 +276,17 @@ def toggle_star(request, project_id):
             project.starred_by.add(request.user)
 
     return redirect("main:show_projects")
+
+
+# Editor dan pemilik punya hak pengguna biasa, jadi sama-sama boleh memberi star.
+@login_required(login_url="/login/")
+def toggle_star_certification(request, certification_id):
+    certification = get_object_or_404(Certification, pk=certification_id)
+
+    if request.method == "POST":
+        if request.user in certification.starred_by.all():
+            certification.starred_by.remove(request.user)
+        else:
+            certification.starred_by.add(request.user)
+
+    return redirect("main:show_certifications")

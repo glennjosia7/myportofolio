@@ -1,7 +1,7 @@
 import json
 from datetime import date
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, Permission, User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -434,6 +434,21 @@ class ProjectTest(TestCase):
 
 class CertificationTest(TestCase):
     def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="owner", password="ownerpass123"
+        )
+        self.user = User.objects.create_user(
+            username="visitor", password="visitorpass123"
+        )
+        self.editor = User.objects.create_user(
+            username="editor", password="editorpass123"
+        )
+        editor_group, _ = Group.objects.get_or_create(name="Editor")
+        editor_group.permissions.add(
+            Permission.objects.get(codename="change_certification")
+        )
+        self.editor.groups.add(editor_group)
+        self.client.force_login(self.admin)
         self.certification = Certification.objects.create(
             name="Web Security Fundamentals",
             issuing_organization="Security Academy",
@@ -521,6 +536,149 @@ class CertificationTest(TestCase):
         )
         self.assertEqual(post_response.status_code, 302)
         self.assertFalse(Certification.objects.filter(pk=self.certification.id).exists())
+
+    def test_certification_writes_require_login(self):
+        self.client.logout()
+
+        for url in [
+            reverse("main:create_certification"),
+            reverse("main:update_certification", args=[self.certification.id]),
+            reverse("main:delete_certification", args=[self.certification.id]),
+        ]:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.url.startswith(reverse("main:login")))
+
+    def test_regular_user_forbidden_from_certification_writes(self):
+        self.client.force_login(self.user)
+
+        for url in [
+            reverse("main:create_certification"),
+            reverse("main:update_certification", args=[self.certification.id]),
+            reverse("main:delete_certification", args=[self.certification.id]),
+        ]:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 403)
+
+    def test_editor_can_update_but_not_create_or_delete(self):
+        self.client.force_login(self.editor)
+
+        self.assertEqual(
+            self.client.get(
+                reverse("main:update_certification", args=[self.certification.id])
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(reverse("main:create_certification")).status_code, 403
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("main:delete_certification", args=[self.certification.id])
+            ).status_code,
+            403,
+        )
+
+    def test_editor_can_save_certification_update(self):
+        self.client.force_login(self.editor)
+
+        response = self.client.post(
+            reverse("main:update_certification", args=[self.certification.id]),
+            {
+                "name": "Editor Updated Certificate",
+                "issuing_organization": self.certification.issuing_organization,
+                "issue_date": "2026-09-01",
+                "expiration_date": "",
+                "credential_id": self.certification.credential_id,
+                "credential_url": self.certification.credential_url,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.certification.refresh_from_db()
+        self.assertEqual(self.certification.name, "Editor Updated Certificate")
+        self.assertContains(response, "Certification berhasil diperbarui!")
+
+    def test_certification_controls_follow_permissions(self):
+        owner = self.client.get(reverse("main:show_certifications"))
+        self.assertContains(owner, reverse("main:create_certification"))
+        self.assertContains(
+            owner,
+            reverse("main:update_certification", args=[self.certification.id]),
+        )
+        self.assertContains(
+            owner,
+            reverse("main:delete_certification", args=[self.certification.id]),
+        )
+
+        self.client.force_login(self.user)
+        viewer = self.client.get(reverse("main:show_certifications"))
+        self.assertNotContains(viewer, "Add Certification")
+        self.assertNotContains(
+            viewer,
+            reverse("main:update_certification", args=[self.certification.id]),
+        )
+        self.assertNotContains(
+            viewer,
+            reverse("main:delete_certification", args=[self.certification.id]),
+        )
+
+        self.client.force_login(self.editor)
+        editor_view = self.client.get(reverse("main:show_certifications"))
+        self.assertNotContains(editor_view, "Add Certification")
+        self.assertContains(
+            editor_view,
+            reverse("main:update_certification", args=[self.certification.id]),
+        )
+        self.assertNotContains(
+            editor_view,
+            reverse("main:delete_certification", args=[self.certification.id]),
+        )
+
+    def test_toggle_star_certification_adds_and_removes(self):
+        star_url = reverse(
+            "main:toggle_star_certification", args=[self.certification.id]
+        )
+        self.client.force_login(self.user)
+
+        self.client.post(star_url)
+        self.assertIn(self.user, self.certification.starred_by.all())
+        self.assertEqual(self.certification.starred_by.count(), 1)
+
+        self.client.post(star_url)
+        self.assertNotIn(self.user, self.certification.starred_by.all())
+        self.assertEqual(self.certification.starred_by.count(), 0)
+
+    def test_toggle_star_certification_requires_login(self):
+        star_url = reverse(
+            "main:toggle_star_certification", args=[self.certification.id]
+        )
+        self.client.logout()
+
+        response = self.client.post(star_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("main:login")))
+        self.assertEqual(self.certification.starred_by.count(), 0)
+
+    def test_certification_star_count_and_status_in_template(self):
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse("main:toggle_star_certification", args=[self.certification.id])
+        )
+        response = self.client.get(reverse("main:show_certifications"))
+
+        self.assertContains(response, "Unstar")
+        self.assertContains(response, '<span class="star-count">1</span>', html=True)
+
+    def test_certifications_json_uses_natural_keys_for_stars(self):
+        self.certification.starred_by.add(self.user)
+        response = self.client.get(reverse("main:get_certifications_json"))
+        data = json.loads(response.content)
+
+        self.assertEqual(data[0]["fields"]["starred_by"], [["visitor"]])
 
 
 class AuthenticationTest(TestCase):

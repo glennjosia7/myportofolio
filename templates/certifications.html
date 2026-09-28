@@ -10,7 +10,9 @@
                 <p class="section-kicker">Credentials &amp; licenses</p>
                 <h1 id="certifications-title">Certifications<span class="accent">.</span></h1>
             </div>
-            <a href="{% url 'main:create_certification' %}" class="button">Add Certification</a>
+            {% if perms.main.add_certification %}
+                <a href="{% url 'main:create_certification' %}" class="button">Add Certification</a>
+            {% endif %}
         </div>
         <p class="page-intro">A record of certifications and credentials.</p>
     </header>
@@ -43,11 +45,16 @@
                 <p class="certification-credential"><strong>Credential ID:</strong> {{ certification.credential_id }}</p>
                 <div class="certification-card__actions">
                     <a href="{{ certification.credential_url }}" class="button" target="_blank" rel="noopener">Verify Credential</a>
-                    <a href="{% url 'main:update_certification' certification.id %}" class="button button-secondary">Edit</a>
-                    <form method="post" action="{% url 'main:delete_certification' certification.id %}">
-                        {% csrf_token %}
-                        <button type="submit" class="button button-danger">Delete</button>
-                    </form>
+                    {% include "components/certification_star.html" with certification=certification %}
+                    {% if perms.main.change_certification %}
+                        <a href="{% url 'main:update_certification' certification.id %}" class="button button-secondary">Edit</a>
+                    {% endif %}
+                    {% if perms.main.delete_certification %}
+                        <form method="post" action="{% url 'main:delete_certification' certification.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="button button-danger">Delete</button>
+                        </form>
+                    {% endif %}
                 </div>
             </article>
         {% empty %}
