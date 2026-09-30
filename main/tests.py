@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.contrib.staticfiles import finders
 
+from main.forms import ProjectForm
 from main.models import Achievement, Certification, Experience, Project
 
 
@@ -231,12 +232,7 @@ class ProjectTest(TestCase):
             project_url="https://github.com/glennjosia7/myportofolio",
         )
 
-    def test_projects_page_uses_json_data_and_title_filter(self):
-        other_project = Project.objects.create(
-            title="Unrelated Project",
-            description="Another project.",
-            tech_stack="Python",
-        )
+    def test_projects_page_renders_ajax_shell(self):
         response = self.client.get(
             reverse("main:show_projects"),
             {"title": "portfolio"},
@@ -244,23 +240,30 @@ class ProjectTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "project.html")
-        self.assertEqual(
-            [project.title for project in response.context["project_list"]],
-            [self.project.title],
-        )
-        self.assertContains(response, self.project.title)
-        self.assertNotContains(response, other_project.title)
+        self.assertContains(response, 'id="grid"')
+        self.assertContains(response, 'id="project-search-form"')
         self.assertContains(response, 'value="portfolio"')
 
-    def test_projects_json_endpoint_serializes_projects(self):
-        response = self.client.get(reverse("main:get_projects_json"))
+    def test_projects_json_endpoint_filters_and_exposes_star_fields(self):
+        Project.objects.create(
+            title="Unrelated Project",
+            description="Another project.",
+            tech_stack="Python",
+        )
+        response = self.client.get(
+            reverse("main:get_projects_json"),
+            {"title": "portfolio"},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/json")
         data = json.loads(response.content)
         self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]["model"], "main.project")
+        self.assertEqual(data[0]["pk"], str(self.project.id))
         self.assertEqual(data[0]["fields"]["title"], self.project.title)
+        self.assertEqual(data[0]["fields"]["star_count"], 0)
+        self.assertFalse(data[0]["fields"]["is_starred"])
+        self.assertEqual(data[0]["fields"]["starred_by_names"], "")
 
     def test_create_project_with_form(self):
         response = self.client.get(reverse("main:create_project"))
@@ -391,19 +394,13 @@ class ProjectTest(TestCase):
 
     def test_project_write_controls_only_for_superuser(self):
         owner_response = self.client.get(reverse("main:show_projects"))
-        self.assertContains(owner_response, reverse("main:create_project"))
-        self.assertContains(
-            owner_response,
-            reverse("main:update_project", args=[self.project.id]),
-        )
+        self.assertContains(owner_response, 'id="add-project-modal"')
+        self.assertContains(owner_response, "Tambah Proyek")
 
         self.client.force_login(self.user)
         viewer_response = self.client.get(reverse("main:show_projects"))
         self.assertNotContains(viewer_response, "Tambah Proyek")
-        self.assertNotContains(
-            viewer_response,
-            reverse("main:update_project", args=[self.project.id]),
-        )
+        self.assertNotContains(viewer_response, 'id="add-project-modal"')
 
     def test_toggle_star_adds_and_removes(self):
         star_url = reverse("main:toggle_star", args=[self.project.id])
@@ -424,12 +421,118 @@ class ProjectTest(TestCase):
         self.assertTrue(response.url.startswith(reverse("main:login")))
         self.assertEqual(self.project.starred_by.count(), 0)
 
-    def test_projects_json_uses_natural_keys_for_stars(self):
+    def test_projects_json_reports_user_star_status(self):
         self.project.starred_by.add(self.user)
+        self.client.force_login(self.user)
         response = self.client.get(reverse("main:get_projects_json"))
         data = json.loads(response.content)
 
-        self.assertEqual(data[0]["fields"]["starred_by"], [["visitor"]])
+        self.assertEqual(data[0]["fields"]["star_count"], 1)
+        self.assertTrue(data[0]["fields"]["is_starred"])
+        self.assertEqual(data[0]["fields"]["starred_by_names"], "visitor")
+
+    def test_create_project_ajax_creates_project_for_superuser(self):
+        response = self.client.post(
+            reverse("main:create_project_ajax"),
+            {
+                "title": "AJAX Project",
+                "description": "Made via AJAX.",
+                "tech_stack": "Django",
+                "project_url": "",
+                "project_image_url": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(Project.objects.filter(title="AJAX Project").exists())
+        self.assertEqual(
+            json.loads(response.content)["message"],
+            "Proyek berhasil ditambahkan.",
+        )
+
+    def test_create_project_ajax_requires_post(self):
+        response = self.client.get(reverse("main:create_project_ajax"))
+        self.assertEqual(response.status_code, 405)
+
+    def test_create_project_ajax_forbidden_for_anonymous(self):
+        self.client.logout()
+        response = self.client.post(
+            reverse("main:create_project_ajax"),
+            {
+                "title": "Nope",
+                "description": "",
+                "tech_stack": "",
+                "project_url": "",
+                "project_image_url": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertFalse(Project.objects.filter(title="Nope").exists())
+
+    def test_create_project_ajax_forbidden_for_regular_user(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("main:create_project_ajax"),
+            {
+                "title": "Nope",
+                "description": "",
+                "tech_stack": "",
+                "project_url": "",
+                "project_image_url": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Project.objects.filter(title="Nope").exists())
+
+    def test_create_project_ajax_rejects_invalid_form(self):
+        response = self.client.post(
+            reverse("main:create_project_ajax"),
+            {
+                "title": "   ",
+                "description": "",
+                "tech_stack": "",
+                "project_url": "not-a-url",
+                "project_image_url": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("errors", json.loads(response.content))
+
+
+class ProjectFormTest(TestCase):
+    def test_form_strips_html_tags_from_text_fields(self):
+        form = ProjectForm(
+            data={
+                "title": "Halo <b>dunia</b>",
+                "description": "Deskripsi <script>alert(1)</script>",
+                "tech_stack": "Django <i>Python</i>",
+                "project_url": "",
+                "project_image_url": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["title"], "Halo dunia")
+        self.assertEqual(form.cleaned_data["description"], "Deskripsi alert(1)")
+        self.assertEqual(form.cleaned_data["tech_stack"], "Django Python")
+
+    def test_form_rejects_title_made_only_of_tags(self):
+        form = ProjectForm(
+            data={
+                "title": '<img src="x" onerror="alert(1)">',
+                "description": "Valid description.",
+                "tech_stack": "Django",
+                "project_url": "",
+                "project_image_url": "",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("title", form.errors)
 
 
 class CertificationTest(TestCase):
