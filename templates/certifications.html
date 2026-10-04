@@ -11,55 +11,270 @@
                 <h1 id="certifications-title">Certifications<span class="accent">.</span></h1>
             </div>
             {% if perms.main.add_certification %}
-                <a href="{% url 'main:create_certification' %}" class="button">Add Certification</a>
+                <button type="button"
+                        class="button"
+                        popovertarget="add-certification-modal">
+                    Add Certification
+                </button>
             {% endif %}
         </div>
         <p class="page-intro">A record of certifications and credentials.</p>
     </header>
 
-    <div class="certification-grid">
-        {% for certification in certification_list %}
-            <article class="certification-card">
-                <div>
-                    <p class="certification-organization">{{ certification.issuing_organization }}</p>
-                    <h2>{{ certification.name }}</h2>
-                </div>
+    <form id="certification-search-form" class="project-search">
+        <input type="search"
+               id="search-input"
+               name="name"
+               value="{{ name_query }}"
+               placeholder="Cari berdasarkan nama atau organisasi"
+               class="project-search__input"
+               aria-label="Cari certification">
+        <button type="submit" class="button">Cari</button>
+    </form>
 
-                <dl class="certification-details">
-                    <div>
-                        <dt>Issued</dt>
-                        <dd><time datetime="{{ certification.issue_date|date:'Y-m-d' }}">{{ certification.issue_date|date:'M Y' }}</time></dd>
-                    </div>
-                    <div>
-                        <dt>Expires</dt>
-                        <dd>
-                            {% if certification.expiration_date %}
-                                <time datetime="{{ certification.expiration_date|date:'Y-m-d' }}">{{ certification.expiration_date|date:'M Y' }}</time>
-                            {% else %}
-                                No expiration
-                            {% endif %}
-                        </dd>
-                    </div>
-                </dl>
-
-                <p class="certification-credential"><strong>Credential ID:</strong> {{ certification.credential_id }}</p>
-                <div class="certification-card__actions">
-                    <a href="{{ certification.credential_url }}" class="button" target="_blank" rel="noopener">Verify Credential</a>
-                    {% include "components/certification_star.html" with certification=certification %}
-                    {% if perms.main.change_certification %}
-                        <a href="{% url 'main:update_certification' certification.id %}" class="button button-secondary">Edit</a>
-                    {% endif %}
-                    {% if perms.main.delete_certification %}
-                        <form method="post" action="{% url 'main:delete_certification' certification.id %}">
-                            {% csrf_token %}
-                            <button type="submit" class="button button-danger">Delete</button>
-                        </form>
-                    {% endif %}
-                </div>
-            </article>
-        {% empty %}
-            <p class="empty-state">No certifications added yet.</p>
-        {% endfor %}
+    <!-- Loading State -->
+    <div id="loading" class="empty-state hide">
+        <p>Memuat certifications...</p>
     </div>
+    <!-- Error State -->
+    <div id="error" class="empty-state hide">
+        <p>Gagal memuat data certifications. Silakan coba lagi.</p>
+    </div>
+    <!-- Empty State -->
+    <div id="empty" class="empty-state hide">
+        <p>Belum ada certification yang ditambahkan atau ditemukan.</p>
+    </div>
+    <!-- Certification Grid -->
+    <div id="grid" class="certification-grid hide"></div>
 </section>
+
+{% if perms.main.add_certification %}
+    {% include "components/certification_form_modal.html" %}
+{% endif %}
+
+<script>
+    // Konfigurasi
+    const CERTS_ENDPOINT = "{% url 'main:get_certifications_json' %}";
+    const CREATE_CERT_ENDPOINT = "{% url 'main:create_certification_ajax' %}";
+    // URL template memakai id dummy 0 yang diganti dengan id asli dari JSON.
+    const UPDATE_URL_TEMPLATE = "{% url 'main:update_certification' 0 %}";
+    const DELETE_URL_TEMPLATE = "{% url 'main:delete_certification' 0 %}";
+    const STAR_URL_TEMPLATE = "{% url 'main:toggle_star_certification' 0 %}";
+    const CAN_ADD_CERTIFICATION = "{{ perms.main.add_certification|yesno:'true,false' }}" === "true";
+    const CAN_CHANGE_CERTIFICATION = "{{ perms.main.change_certification|yesno:'true,false' }}" === "true";
+    const CAN_DELETE_CERTIFICATION = "{{ perms.main.delete_certification|yesno:'true,false' }}" === "true";
+    let certificationsAbortController;
+
+    // Elemen DOM
+    const loadingState = document.getElementById('loading');
+    const errorState = document.getElementById('error');
+    const emptyState = document.getElementById('empty');
+    const gridContainer = document.getElementById('grid');
+    const searchForm = document.getElementById('certification-search-form');
+    const searchInput = document.getElementById('search-input');
+    const SEARCH_DEBOUNCE_DELAY = 300;
+    let searchDebounceTimer;
+
+    // Menyembunyikan/Menampilkan section halaman
+    function displayPageSection({ showLoading = false, showError = false, showEmpty = false, showGrid = false }) {
+        loadingState.classList.toggle('hide', !showLoading);
+        errorState.classList.toggle('hide', !showError);
+        emptyState.classList.toggle('hide', !showEmpty);
+        gridContainer.classList.toggle('hide', !showGrid);
+    }
+
+    // Mengubah karakter khusus HTML menjadi entity agar ditampilkan sebagai teks
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    // Membaca nilai cookie, digunakan untuk mengambil token CSRF
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Mengganti id dummy pada URL template dengan id asli
+    function buildUrl(template, id) {
+        return template.replace('/0/', `/${id}/`);
+    }
+
+    // Menampilkan tanggal ISO (YYYY-MM-DD) sebagai "Mon YYYY"
+    function formatMonthYear(value) {
+        if (!value) return '';
+        const date = new Date(`${value}T00:00:00`);
+        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
+
+    // Membuat elemen card certification
+    function buildCertificationCardElement(item) {
+        const certification = item.fields;
+        const certificationId = item.pk;
+        const articleElement = document.createElement('article');
+        articleElement.className = 'certification-card';
+
+        const expiresHtml = certification.expiration_date
+            ? `<time datetime="${escapeHtml(certification.expiration_date)}">${formatMonthYear(certification.expiration_date)}</time>`
+            : 'No expiration';
+
+        const editHtml = CAN_CHANGE_CERTIFICATION
+            ? `<a href="${buildUrl(UPDATE_URL_TEMPLATE, certificationId)}" class="button button-secondary">Edit</a>`
+            : '';
+        const deleteHtml = CAN_DELETE_CERTIFICATION
+            ? `<form method="post" action="${buildUrl(DELETE_URL_TEMPLATE, certificationId)}">
+                    {% csrf_token %}
+                    <button type="submit" class="button button-danger" onclick="return confirm('Yakin ingin menghapus certification ini?');">Delete</button>
+                </form>`
+            : '';
+
+        const isStarredClass = certification.is_starred ? ' is-starred' : '';
+        const starText = certification.is_starred ? 'Unstar' : 'Star';
+        const starTitle = certification.star_count > 0
+            ? `Dibintangi oleh ${escapeHtml(certification.starred_by_names)}`
+            : 'Jadilah yang pertama memberi star';
+
+        articleElement.innerHTML = `
+            <div>
+                <p class="certification-organization">${escapeHtml(certification.issuing_organization)}</p>
+                <h2>${escapeHtml(certification.name)}</h2>
+            </div>
+            <dl class="certification-details">
+                <div>
+                    <dt>Issued</dt>
+                    <dd><time datetime="${escapeHtml(certification.issue_date)}">${formatMonthYear(certification.issue_date)}</time></dd>
+                </div>
+                <div>
+                    <dt>Expires</dt>
+                    <dd>${expiresHtml}</dd>
+                </div>
+            </dl>
+            <p class="certification-credential"><strong>Credential ID:</strong> ${escapeHtml(certification.credential_id)}</p>
+            <div class="certification-card__actions">
+                <a href="${escapeHtml(certification.credential_url)}" class="button" target="_blank" rel="noopener">Verify Credential</a>
+                <form method="post" action="${buildUrl(STAR_URL_TEMPLATE, certificationId)}" class="star-form">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="button button-star${isStarredClass}"
+                            title="${starTitle}">
+                        <span aria-hidden="true">&#9733;</span>
+                        ${starText}
+                        <span class="star-count">${certification.star_count}</span>
+                    </button>
+                </form>
+                ${editHtml}
+                ${deleteHtml}
+            </div>
+        `;
+        return articleElement;
+    }
+
+    // Fetch data certification
+    async function fetchCertifications(searchQuery = "") {
+        if (certificationsAbortController) certificationsAbortController.abort();
+        certificationsAbortController = new AbortController();
+        try {
+            displayPageSection({ showLoading: true });
+            const url = searchQuery
+                ? `${CERTS_ENDPOINT}?name=${encodeURIComponent(searchQuery)}`
+                : CERTS_ENDPOINT;
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json' },
+                signal: certificationsAbortController.signal,
+            });
+            if (!response.ok) throw new Error('Failed to fetch data');
+            const certificationData = await response.json();
+            if (certificationData.length === 0) {
+                displayPageSection({ showEmpty: true });
+            } else {
+                gridContainer.innerHTML = '';
+                certificationData.forEach(item => {
+                    gridContainer.appendChild(buildCertificationCardElement(item));
+                });
+                displayPageSection({ showGrid: true });
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+            console.error('Error loading certifications:', error);
+            displayPageSection({ showError: true });
+        }
+    }
+
+    // Event Handlers untuk Form Search
+    function searchCertifications() {
+        fetchCertifications(searchInput.value.trim());
+    }
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(function () {
+            searchCertifications();
+        }, SEARCH_DEBOUNCE_DELAY);
+    });
+
+    searchForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        clearTimeout(searchDebounceTimer);
+        searchCertifications();
+    });
+
+    // Modal tambah certification (hanya ada bila pengguna berhak menambah)
+    const certificationForm = document.getElementById('certification-form');
+
+    function closeCertificationModal() {
+        document.getElementById('add-certification-modal').hidePopover();
+    }
+
+    // Mengirim data form ke server
+    async function addCertification(event) {
+        event.preventDefault();
+        const submitButton = certificationForm.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        try {
+            const response = await fetch(CREATE_CERT_ENDPOINT, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                body: new FormData(certificationForm),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (response.ok) {
+                certificationForm.reset();
+                closeCertificationModal();
+                showToast('Berhasil', 'Certification baru berhasil ditambahkan!', 'success');
+                fetchCertifications(searchInput.value.trim());
+            } else {
+                const errorMessages = result.errors
+                    ? Object.values(result.errors).flat().map(error => error.message)
+                    : [result.message || `Terjadi kesalahan (status ${response.status}).`];
+                showToast('Gagal menambahkan certification', errorMessages.join(' '), 'error');
+            }
+        } catch (error) {
+            console.error('Error adding certification:', error);
+            showToast('Gagal menambahkan certification', 'Tidak dapat terhubung ke server. Silakan coba lagi.', 'error');
+        } finally {
+            submitButton.disabled = false;
+        }
+    }
+
+    if (certificationForm) {
+        certificationForm.addEventListener('submit', addCertification);
+    }
+
+    // Start application
+    fetchCertifications(searchInput.value.trim());
+</script>
 {% endblock content %}

@@ -22,17 +22,19 @@ Project ini merupakan hasil pengerjaan Tutorial 0 sampai Tutorial 4 serta Tugas 
 - Halaman Achievements berisi lima hasil kompetisi CTF dari database beserta buktinya.
 - Halaman utama memuat preview Experience dan Achievement dengan tautan menuju halaman lengkap.
 - Halaman Projects dengan Create, Update, Delete, pencarian berdasarkan judul, dan endpoint JSON.
-- Halaman Certifications dengan Create, Update, Delete, dan endpoint JSON.
+- Halaman Certifications memuat data lewat AJAX (`fetch()`) dari endpoint JSON dengan kondisi loading, kosong, dan error, pencarian debounced tanpa reload, modal tambah data, serta notifikasi toast.
+- Halaman Certifications tetap menyediakan Create, Update, Delete, dan endpoint JSON.
 - Registrasi, login, dan logout memakai sistem autentikasi bawaan Django, serta status login pada navbar.
 - Session dan cookie `last_login` yang di-set saat login dan dihapus saat logout.
 - Otorisasi berbasis peran: pengunjung (baca), pengguna biasa (baca + star), Editor (update), dan pemilik/superuser (create, update, delete).
 - Fitur star pada Projects dan Certifications (maksimal satu star per pengguna) dengan jumlah star dan status pengguna.
-- JSON Data Delivery melalui `django.core.serializers`, lalu deserialisasi sebelum dirender ke template; relasi star memakai natural key (username) agar id internal tidak bocor.
+- JSON Data Delivery dibangun manual dengan `JsonResponse`; relasi star dikirim sebagai jumlah star dan status star pengguna, sedangkan daftar pemberi star memakai username agar id internal tidak bocor.
 - Navbar transparan dengan blur, tetap di atas saat di-scroll, dan penanda halaman aktif.
 - Navbar dan footer bersama melalui template inheritance Django (`base.html`).
 - Form berbasis ModelForm dengan validasi Django dan proteksi CSRF pada setiap request POST.
 - Unit test otomatis untuk model, view, form, routing, serialization, dan tampilan halaman.
-- Tampilan responsif untuk desktop, tablet, dan perangkat seluler tanpa JavaScript.
+- Tampilan responsif untuk desktop, tablet, dan perangkat seluler.
+- Perlindungan XSS dua lapis pada Certifications: `strip_tags` di `clean_<field>` sisi server dan `escapeHtml` untuk setiap nilai yang disisipkan ke HTML lewat JavaScript.
 
 # Technology Stack
 
@@ -198,7 +200,53 @@ Penyembunyian di template hanya mengatur tampilan. Penolakan sebenarnya tetap di
 
 ## Integritas API
 
-Endpoint `/certifications/json/` dan `/api/projects/` memakai `serializers.serialize(..., use_natural_foreign_keys=True)`, sehingga daftar pemberi star muncul sebagai username, bukan id internal database. Contoh: `"starred_by": [["glenn"]]`. Tidak ada password atau email yang ikut terserialisasi.
+Endpoint `/certifications/json/` dan `/api/projects/` membangun respons JSON manual dengan `JsonResponse`. Relasi star dikirim sebagai `star_count`, `is_starred`, dan `starred_by_names` (username), bukan id internal database. Tidak ada password atau email yang ikut diserialisasi.
+
+# Tugas 5 Implementation
+
+Tugas 5 menerapkan seluruh pola interaktivitas JavaScript dari Tutorial 05 (AJAX, debouncing, modal, toast, dan proteksi XSS) pada bagian **Certifications** yang sebelumnya dikerjakan di Tugas 3 dan Tugas 4. Halaman daftar kini hanya merender kerangka, lalu data diambil dari endpoint JSON.
+
+## Menampilkan data dengan AJAX
+
+- `show_certifications` tidak lagi mengirim data ke template. View hanya menyiapkan `name_query` dan `CertificationForm()`, lalu merender `certifications.html` sebagai kerangka.
+- `certifications.html` memanggil `get_certifications_json` lewat `fetch()` dengan header `Accept: application/json`.
+- `get_certifications_json` membangun daftar JSON secara manual dengan `JsonResponse`, termasuk `star_count`, `is_starred`, dan `starred_by_names` dari fitur star Tugas 4. Untuk pengunjung yang belum login, `is_starred` bernilai `false`.
+- Terdapat tiga kondisi non-data yang dikendalikan class `hide`: `#loading` saat `fetch()` berjalan, `#empty` ketika hasil kosong, dan `#error` ketika request gagal atau status HTTP bukan 2xx.
+- `AbortController` membatalkan request lama saat pengguna mengetik cepat agar hasil tidak saling menimpa.
+
+## Pencarian dengan debouncing
+
+- Input pencarian `#search-input` memfilter berdasarkan `name` atau `issuing_organization`.
+- Event `input` memakai `setTimeout` 300 ms (`SEARCH_DEBOUNCE_DELAY`) yang selalu di-`clearTimeout` sebelum dijadwalkan ulang, sehingga request hanya dikirim setelah pengguna berhenti mengetik.
+- Form pencarian tetap menangani `submit` (Enter) dengan `preventDefault()` lalu memanggil pencarian segera.
+
+## Menambah data dengan modal dan AJAX
+
+- `templates/components/certification_form_modal.html` menampilkan `CertificationForm` di dalam modal popover pada halaman daftar, hanya untuk pengguna dengan `perms.main.add_certification`.
+- View `create_certification_ajax` (`@require_POST`) memvalidasi input dengan `CertificationForm` dan memeriksa `request.user.has_perm("main.add_certification")` di sisi server. Responsnya: `201` berhasil, `400` dengan `errors` validasi, dan `403` bila tidak berhak.
+- Token CSRF dikirim lewat header `X-CSRFToken` yang dibaca dari cookie dengan `getCookie('csrftoken')`.
+- Setelah berhasil, form di-reset, modal ditutup, toast sukses muncul, dan `fetchCertifications()` dipanggil ulang tanpa reload halaman.
+
+## Notifikasi toast
+
+- `showToast` dari `static/js/toast.js` (dimuat di `base.html`) dipakai di halaman Certifications.
+- Toast sukses muncul saat data berhasil ditambahkan. Toast error muncul saat validasi gagal (memakai pesan dari `result.errors`) maupun saat koneksi gagal.
+
+## Perlindungan XSS
+
+- Sisi klien: setiap nilai teks dari JSON disisipkan lewat `escapeHtml()` sebelum masuk ke `innerHTML`.
+- Sisi server: `CertificationForm` membersihkan `name`, `issuing_organization`, dan `credential_id` dengan `strip_tags` pada `clean_<field>`. Nama yang hanya berisi tag HTML ditolak dengan `ValidationError` sehingga server membalas `400`.
+- Uji manual dengan `<img src="x" onerror="alert('XSS!')">`: server menolak nama yang hanya berisi tag tersebut, dan data yang mengandung tag disimpan tanpa tag sehingga tidak ada `alert` yang muncul.
+
+# Tugas 5 Reflection
+
+### Tugas 5
+
+1. **Jelaskan apa itu debouncing dan mengapa teknik ini penting pada fitur pencarian berbasis AJAX.** Debouncing adalah teknik menunda eksekusi sebuah fungsi sampai pengguna berhenti melakukan aksi selama selang waktu tertentu. Pada pencarian, setiap ketikan memicu `setTimeout` 300 ms; jika pengguna mengetik lagi sebelum 300 ms, timer lama dibatalkan dengan `clearTimeout` dan timer baru dijadwalkan. Tanpa debouncing, setiap huruf akan mengirim satu request sehingga server dibanjiri permintaan, sebagian hasil sudah tidak relevan, dan request yang datang tidak berurutan bisa menimpa hasil terbaru. Debouncing membuat jumlah request jauh lebih sedikit dan hanya mewakili kata kunci final pengguna.
+
+2. **Apa fungsi `await` pada `fetch()`, dan apa yang terjadi bila tidak dipakai?** `fetch()` mengembalikan `Promise`, bukan data. `await` menunggu Promise selesai lalu mengembalikan `Response`, sehingga baris berikutnya (`response.json()`) baru berjalan setelah respons benar-benar tersedia. `response.json()` juga mengembalikan Promise, jadi perlu `await` kedua. Bila `await` dihilangkan, variabel `response` akan berisi objek `Promise` yang belum selesai; memanggil `response.ok` menghasilkan `undefined` dan `response.json()` hanya mengembalikan Promise, sehingga logika tampilan (loading, error, render data) berjalan pada waktu yang salah atau gagal total.
+
+3. **Jelaskan serangan XSS dan mengapa data yang ditampilkan lewat AJAX/JavaScript lebih rentan dibanding data yang dirender langsung oleh template Django.** XSS (Cross-Site Scripting) terjadi ketika input pengguna diperlakukan sebagai HTML/JavaScript dan dieksekusi oleh browser, misalnya `<img src="x" onerror="alert('XSS!')">`. Template Django otomatis meng-escape variabel (`{{ ... }}`) sehingga `<` menjadi `&lt;` dan tag tidak dieksekusi. Sebaliknya, data JSON yang disisipkan lewat `innerHTML` pada JavaScript tidak melewati auto-escape tersebut; bila nilai dikirim apa adanya, browser akan menafsirkannya sebagai HTML dan menjalankan skrip. Karena itu setiap nilai harus di-escape manual (`escapeHtml`/`textContent`) sekaligus dibersihkan di server dengan `strip_tags`.
 
 # Testing
 
@@ -208,19 +256,21 @@ python manage.py makemigrations --check --dry-run
 python manage.py test
 ```
 
-Test mencakup URL dan template, pengambilan data dari database, kondisi kosong, tahun opsional, escaping teks HTML, keberadaan file bukti, kesesuaian fixture, konsistensi navigasi, serta seluruh alur Tugas 3 dan Tugas 4:
+Test mencakup URL dan template, pengambilan data dari database, kondisi kosong, tahun opsional, escaping teks HTML, keberadaan file bukti, kesesuaian fixture, konsistensi navigasi, serta seluruh alur Tugas 3, Tugas 4, dan Tugas 5:
 
 - create, update, dan delete Project maupun Certification;
 - penolakan form tidak valid;
 - delete hanya berjalan pada request POST;
 - endpoint JSON mengembalikan `Content-Type: application/json` dan field yang benar;
-- halaman daftar menggunakan data hasil deserialisasi JSON;
+- halaman Certifications merender kerangka AJAX dan mengambil data dari endpoint JSON;
+- endpoint JSON Certifications mengirim `star_count`, `is_starred`, dan `starred_by_names`, serta filter nama/organisasi;
+- view AJAX `create_certification_ajax`: `201` berhasil, `400` pada input tidak valid, `403` tanpa permission, dan `strip_tags` membersihkan tag HTML;
 - autentikasi: register, login (cookie `last_login`), logout, dan tampilan navbar;
 - otorisasi Certification: pengunjung dialihkan ke login, pengguna biasa `403`, Editor boleh update tetapi `403` untuk create/delete, pemilik boleh semuanya;
-- penyembunyian tombol aksi sesuai permission pada template;
-- star pada Project dan Certification (tambah, batalkan, maksimal satu per pengguna) serta natural key pada JSON.
+- penyembunyian tombol aksi dan flag permission pada template;
+- star pada Project dan Certification (tambah, batalkan, maksimal satu per pengguna) serta username pada JSON.
 
-Pemeriksaan lokal terakhir pada 26 September 2026: 53 test lulus, `check` tidak menemukan masalah, dan tidak ada perubahan model yang belum memiliki migrasi. Alur empat peran (pengunjung, pengguna biasa, Editor, pemilik) juga diperiksa pada browser, termasuk status `403`, penyembunyian tombol, star, dan penghapusan cookie `last_login` saat logout. Test berjalan di database test terpisah sehingga tidak menghapus data portofolio lokal.
+Pemeriksaan lokal terakhir pada 4 Oktober 2026: 66 test lulus (`python manage.py test`), `check` tidak menemukan masalah, dan tidak ada perubahan model yang belum memiliki migrasi. Alur empat peran (pengunjung, pengguna biasa, Editor, pemilik) juga diperiksa pada browser, termasuk status `403`, penyembunyian tombol, star, dan penghapusan cookie `last_login` saat logout. Test berjalan di database test terpisah sehingga tidak menghapus data portofolio lokal.
 
 # Reflection Questions
 
@@ -264,18 +314,39 @@ Bagian yang dibantu terutama pada review struktur dan penjelasan konsep. Penentu
 
 Pengembang tetap membaca ketentuan tugas, memeriksa struktur repository, menyesuaikan kode dengan pola Project yang sudah ada, dan menjalankan test secara manual. Kode tidak langsung diterima sebagai hasil otomatis; setiap bagian diperiksa kembali agar sesuai dengan fitur yang benar-benar digunakan.
 
+Dalam pengerjaan Tugas 5, bantuan **AI ChatGPT Web** (ChatGPT Website) digunakan untuk:
+
+- memahami konsep debouncing dan cara membatalkan permintaan AJAX yang sudah tidak relevan melalui `AbortController`;
+- memahami perbedaan `async`/`await`, `fetch()`, dan penanganan error pada pemanggilan AJAX;
+- memahami alasan data JSON lebih rentan XSS dibanding data yang dirender template Django dan cara meng-escape-nya di JavaScript;
+- memeriksa kembali alur `JsonResponse`, status HTTP `201`/`400`/`403`, dan pengiriman token CSRF lewat header `X-CSRFToken`;
+- meninjau modal berbasis ModelForm dan cara memperbarui daftar tanpa reload halaman.
+
+Strategi prompting yang dipakai adalah meminta penjelasan konsep terlebih dahulu, lalu meminta contoh kode kecil, kemudian membandingkan hasilnya dengan pola yang sudah ada di halaman Projects. Setiap jawaban diperiksa dengan menjalankan `python manage.py test` dan mencoba alurnya di browser. Penulisan kode akhir, penyesuaian nama variabel, dan pengujian dilakukan manual.
+
+## Prompt pembelajaran Tugas 5 (AI ChatGPT Web)
+
+1. Jelaskan konsep debouncing pada pencarian AJAX. Mengapa mengirim request di setiap ketikan itu boros, dan bagaimana `setTimeout` + `clearTimeout` menyelesaikannya? Berikan contoh dengan jeda 300 ms.
+2. Jika fungsi pencarianku `async`, di titik mana `await` harus dipakai pada `fetch()` dan `response.json()`? Apa yang terjadi pada `response.ok` dan hasil render kalau `await` dihilangkan?
+3. Mengapa template Django otomatis meng-escape `{{ variabel }}` tetapi `innerHTML` tidak? Tunjukkan contoh payload `<img src="x" onerror="alert('XSS!')">` dan cara `escapeHtml()` menetralkannya.
+4. Bagaimana menyusun respons JSON manual dengan `JsonResponse` yang berisi jumlah star dan status star pengguna yang sedang login, tanpa membocorkan id internal?
+5. Bagaimana cara view AJAX mengembalikan status `201`, `400`, dan `403` yang tepat untuk berhasil, validasi gagal, dan tidak berhak, serta bagaimana frontend membaca `errors` dari `get_json_data()`?
+6. Bagaimana mengirim token CSRF pada `fetch()` POST lewat header `X-CSRFToken`, dan mengapa membaca cookie `csrftoken` lebih praktis daripada menyalin `csrfmiddlewaretoken` dari DOM?
+7. Mengapa `strip_tags` di `clean_<field>` ModelForm penting sebagai lapisan kedua setelah `escapeHtml`? Dalam kondisi apa pembersihan di sisi server tetap diperlukan meskipun escape di klien sudah dilakukan?
+
 ## Riwayat dan strategi prompting
 
 - Percakapan Tugas 1 (AI ChatGPT Web): https://chatgpt.com/share/6a9ae1a1-4fe8-83ec-8d60-b252bab78aec
 - Percakapan Tugas 2 (AI ChatGPT Web): https://chatgpt.com/share/6aa3d20a-9c40-83ec-b83c-6f973f820a62
 - Percakapan Tugas 3 (AI ChatGPT Web): https://chatgpt.com/share/6aaf89fc-ef68-83ec-b16a-6a1e73766bed
 - Percakapan Tugas 4 (AI ChatGPT Web): https://chatgpt.com/share/6ab9d9ae-0eac-83ec-8fcf-61b219ed6618
+- Percakapan Tugas 5 (AI ChatGPT Web): https://chatgpt.com/share/6ac28198-0f0c-83ec-abeb-4ea8b4cc989b
 
-Log prompt pembelajaran Tugas 4 disimpan di luar repository sebagai catatan pribadi dan tidak di-commit, karena ketentuan tugas tidak mewajibkannya.
+Log prompt pembelajaran Tugas 1-3 disimpan di luar repository sebagai catatan pribadi dan tidak di-commit, karena ketentuan tugas tidak mewajibkannya. Log prompt pembelajaran Tugas 5 dicantumkan pada bagian **Prompt pembelajaran Tugas 5** di atas. Ganti `ISI-TAUTAN-SHARE-TUGAS-5` dengan tautan percakapan ChatGPT Web Tugas 5 sebelum submit.
 
 # Progres Mingguan
 
-Catatan di bawah menjelaskan kondisi proyek pada minggu terkait, bukan struktur akhir setelah Tugas 4.
+Catatan di bawah menjelaskan kondisi proyek pada minggu terkait, bukan struktur akhir setelah Tugas 5.
 
 ## Tutorial 0
 
@@ -392,3 +463,21 @@ Quality check CSS memastikan teks tombol tetap terbaca saat di-hover. Sebelumnya
 - Menambah test otorisasi, star, dan integritas JSON.
 
 Pemeriksaan Tugas 4 pada 26 September 2026: `check` bersih, tidak ada migrasi tertunda, dan 53 test lulus. Alur empat peran juga diperiksa pada browser: pengunjung, pengguna biasa, Editor, dan pemilik, mencakup star, penyembunyian tombol, status `403`, dan cookie `last_login`.
+
+## Tutorial 5
+
+- Mengubah halaman Projects agar datanya dimuat lewat AJAX dengan `fetch()` dan endpoint JSON, lengkap dengan kondisi loading, kosong, dan error.
+- Menambahkan pencarian debounced, modal tambah proyek berbasis `ModelForm`, dan notifikasi toast.
+- Menambahkan proteksi XSS melalui `escapeHtml` di JavaScript dan `strip_tags` di form.
+- Menambahkan endpoint AJAX `projects/add-ajax/` yang membalas JSON dengan status `201`/`400`/`403`.
+
+## Tugas 5
+
+- Menerapkan seluruh pola Tutorial 5 pada bagian **Certifications**: daftar dirender lewat AJAX dari `get_certifications_json` dengan kondisi loading, kosong, dan error.
+- `get_certifications_json` dibangun manual dengan `JsonResponse` dan menyertakan `star_count`, `is_starred`, serta `starred_by_names`, plus filter nama/organisasi untuk pencarian.
+- Menambahkan modal `certification_form_modal.html` dan view `create_certification_ajax` yang memvalidasi `CertificationForm` serta memeriksa permission Tugas 4 (`201`/`400`/`403`).
+- Menambahkan pencarian debounced 300 ms, notifikasi toast, dan pengiriman CSRF lewat header `X-CSRFToken`.
+- Menambahkan `clean_name`, `clean_issuing_organization`, dan `clean_credential_id` dengan `strip_tags` pada `CertificationForm`, serta `escapeHtml` di sisi klien.
+- Memperbarui test: alur AJAX Certifications, format JSON star, filter pencarian, dan perlindungan XSS.
+
+Pemeriksaan Tugas 5 pada 4 Oktober 2026: `check` bersih, tidak ada migrasi tertunda, dan 66 test lulus. Endpoint `/certifications/json/` dan halaman `/certifications/` juga diperiksa dengan `runserver`, termasuk kondisi data kosong dan filter pencarian.

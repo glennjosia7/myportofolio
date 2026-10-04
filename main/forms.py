@@ -96,3 +96,17 @@ class CertificationForm(ModelForm):
             "credential_id": TextInput(attrs={"placeholder": "ABC-123-XYZ"}),
             "credential_url": URLInput(attrs={"placeholder": "https://example.com/verify"}),
         }
+
+    def clean_name(self):
+        name = strip_tags(self.cleaned_data["name"]).strip()
+        if not name:
+            raise ValidationError(
+                "Nama certification tidak boleh hanya berisi tag HTML."
+            )
+        return name
+
+    def clean_issuing_organization(self):
+        return strip_tags(self.cleaned_data["issuing_organization"]).strip()
+
+    def clean_credential_id(self):
+        return strip_tags(self.cleaned_data["credential_id"]).strip()

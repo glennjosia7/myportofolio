@@ -4,9 +4,9 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.core import serializers
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse, JsonResponse
+from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -176,28 +176,85 @@ def delete_project(request, project_id):
 
 
 def get_certifications_json(request):
-    certifications = Certification.objects.order_by("-issue_date", "name")
-    certifications_json = serializers.serialize(
-        "json",
-        certifications,
-        use_natural_foreign_keys=True,
+    name_query = request.GET.get("name", "").strip()
+    certifications = Certification.objects.prefetch_related("starred_by").order_by(
+        "-issue_date", "name"
     )
-    return HttpResponse(certifications_json, content_type="application/json")
+
+    if name_query:
+        certifications = certifications.filter(
+            Q(name__icontains=name_query)
+            | Q(issuing_organization__icontains=name_query)
+        )
+
+    # Konstruksi data JSON secara manual agar bisa menyisipkan logika Star.
+    data = []
+    for certification in certifications:
+        starred_users = certification.starred_by.all()
+        is_starred = (
+            request.user in starred_users
+            if request.user.is_authenticated
+            else False
+        )
+        data.append(
+            {
+                "pk": certification.id,
+                "fields": {
+                    "name": certification.name,
+                    "issuing_organization": certification.issuing_organization,
+                    "issue_date": certification.issue_date.isoformat(),
+                    "expiration_date": (
+                        certification.expiration_date.isoformat()
+                        if certification.expiration_date
+                        else None
+                    ),
+                    "credential_id": certification.credential_id,
+                    "credential_url": certification.credential_url,
+                    "star_count": starred_users.count(),
+                    "is_starred": is_starred,
+                    "starred_by_names": ", ".join(
+                        user.username for user in starred_users
+                    ),
+                },
+            }
+        )
+
+    return JsonResponse(data, safe=False)
 
 
 def show_certifications(request):
-    json_response = get_certifications_json(request)
-    certifications = serializers.deserialize(
-        "json",
-        json_response.content.decode("utf-8"),
-    )
-    certifications = [item.object for item in certifications]
-
     context = {
         "name": "Glenn Josia Devano",
-        "certification_list": certifications,
+        "name_query": request.GET.get("name", "").strip(),
+        "form": CertificationForm(),
     }
     return render(request, "certifications.html", context)
+
+
+@require_POST
+def create_certification_ajax(request):
+    if not request.user.has_perm("main.add_certification"):
+        return JsonResponse(
+            {
+                "message": "Hanya pengguna dengan izin menambah yang dapat "
+                "menambahkan certification."
+            },
+            status=403,
+        )
+
+    form = CertificationForm(request.POST)
+
+    if form.is_valid():
+        certification = form.save()
+        return JsonResponse(
+            {
+                "message": "Certification berhasil ditambahkan.",
+                "pk": certification.id,
+            },
+            status=201,
+        )
+
+    return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
 
 
 @login_required(login_url="/login/")

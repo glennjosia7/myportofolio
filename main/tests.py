@@ -560,25 +560,21 @@ class CertificationTest(TestCase):
             credential_url="https://example.com/verify/SEC-2026-001",
         )
 
-    def test_certifications_page_uses_json_data(self):
+    def test_certifications_page_renders_ajax_skeleton(self):
         response = self.client.get(reverse("main:show_certifications"))
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "certifications.html")
-        self.assertEqual(
-            [item.name for item in response.context["certification_list"]],
-            [self.certification.name],
-        )
-        self.assertContains(response, self.certification.name)
-        self.assertContains(response, self.certification.issuing_organization)
-        self.assertContains(response, "No expiration")
+        self.assertContains(response, reverse("main:get_certifications_json"))
+        self.assertContains(response, reverse("main:create_certification_ajax"))
         self.assertContains(response, "csrfmiddlewaretoken")
 
-    def test_empty_certifications_page(self):
+    def test_empty_certifications_json_returns_empty_list(self):
         Certification.objects.all().delete()
-        response = self.client.get(reverse("main:show_certifications"))
+        response = self.client.get(reverse("main:get_certifications_json"))
 
-        self.assertContains(response, "No certifications added yet.")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content), [])
 
     def test_certifications_json_endpoint(self):
         response = self.client.get(reverse("main:get_certifications_json"))
@@ -586,8 +582,10 @@ class CertificationTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/json")
         data = json.loads(response.content)
-        self.assertEqual(data[0]["model"], "main.certification")
+        self.assertEqual(data[0]["pk"], self.certification.id)
         self.assertEqual(data[0]["fields"]["name"], self.certification.name)
+        self.assertEqual(data[0]["fields"]["star_count"], 0)
+        self.assertFalse(data[0]["fields"]["is_starred"])
 
     def test_create_certification_with_form(self):
         response = self.client.post(
@@ -606,6 +604,118 @@ class CertificationTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Certification.objects.filter(name="Python Certificate").exists())
         self.assertContains(response, "Certification berhasil ditambahkan!")
+
+    def test_create_certification_ajax_returns_201(self):
+        response = self.client.post(
+            reverse("main:create_certification_ajax"),
+            {
+                "name": "AJAX Certificate",
+                "issuing_organization": "AJAX Academy",
+                "issue_date": "2026-09-03",
+                "expiration_date": "",
+                "credential_id": "AJAX-001",
+                "credential_url": "https://example.com/verify/AJAX-001",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        body = json.loads(response.content)
+        self.assertEqual(body["message"], "Certification berhasil ditambahkan.")
+        self.assertTrue(
+            Certification.objects.filter(name="AJAX Certificate").exists()
+        )
+
+    def test_create_certification_ajax_returns_400_on_invalid(self):
+        response = self.client.post(
+            reverse("main:create_certification_ajax"),
+            {"name": "", "issuing_organization": ""},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        body = json.loads(response.content)
+        self.assertIn("name", body["errors"])
+
+    def test_create_certification_ajax_returns_403_without_permission(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("main:create_certification_ajax"),
+            {
+                "name": "Forbidden Certificate",
+                "issuing_organization": "Nope",
+                "issue_date": "2026-09-03",
+                "expiration_date": "",
+                "credential_id": "NOPE-001",
+                "credential_url": "https://example.com/verify/NOPE-001",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Certification.objects.filter(name="Forbidden Certificate").exists()
+        )
+
+    def test_create_certification_ajax_strips_html_tags(self):
+        response = self.client.post(
+            reverse("main:create_certification_ajax"),
+            {
+                "name": "Safe Certification",
+                "issuing_organization": "<b>Academy</b>",
+                "issue_date": "2026-09-03",
+                "expiration_date": "",
+                "credential_id": "<b>SEC</b>-1",
+                "credential_url": "https://example.com/verify/SEC-1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        certification = Certification.objects.get(credential_id="SEC-1")
+        self.assertNotIn("<b>", certification.issuing_organization)
+        self.assertEqual(certification.credential_id, "SEC-1")
+
+    def test_create_certification_ajax_rejects_tag_only_name(self):
+        response = self.client.post(
+            reverse("main:create_certification_ajax"),
+            {
+                "name": '<img src="x" onerror="alert(\'XSS!\')">',
+                "issuing_organization": "Academy",
+                "issue_date": "2026-09-03",
+                "expiration_date": "",
+                "credential_id": "XSS-001",
+                "credential_url": "https://example.com/verify/XSS-001",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("name", json.loads(response.content)["errors"])
+        self.assertFalse(
+            Certification.objects.filter(credential_id="XSS-001").exists()
+        )
+
+    def test_certifications_json_filters_by_name_and_organization(self):
+        Certification.objects.create(
+            name="Cloud Practitioner",
+            issuing_organization="Amazon",
+            issue_date=date(2026, 8, 1),
+            credential_id="AWS-001",
+            credential_url="https://example.com/verify/AWS-001",
+        )
+
+        by_name = json.loads(
+            self.client.get(
+                reverse("main:get_certifications_json"), {"name": "cloud"}
+            ).content
+        )
+        self.assertEqual([item["fields"]["name"] for item in by_name], ["Cloud Practitioner"])
+
+        by_org = json.loads(
+            self.client.get(
+                reverse("main:get_certifications_json"), {"name": "security academy"}
+            ).content
+        )
+        self.assertEqual(
+            [item["fields"]["name"] for item in by_org],
+            [self.certification.name],
+        )
 
     def test_update_certification_with_form(self):
         response = self.client.post(
@@ -707,39 +817,24 @@ class CertificationTest(TestCase):
 
     def test_certification_controls_follow_permissions(self):
         owner = self.client.get(reverse("main:show_certifications"))
-        self.assertContains(owner, reverse("main:create_certification"))
-        self.assertContains(
-            owner,
-            reverse("main:update_certification", args=[self.certification.id]),
-        )
-        self.assertContains(
-            owner,
-            reverse("main:delete_certification", args=[self.certification.id]),
-        )
+        self.assertContains(owner, 'CAN_ADD_CERTIFICATION = "true"')
+        self.assertContains(owner, 'CAN_CHANGE_CERTIFICATION = "true"')
+        self.assertContains(owner, 'CAN_DELETE_CERTIFICATION = "true"')
+        self.assertContains(owner, "Add Certification")
 
         self.client.force_login(self.user)
         viewer = self.client.get(reverse("main:show_certifications"))
+        self.assertContains(viewer, 'CAN_ADD_CERTIFICATION = "false"')
+        self.assertContains(viewer, 'CAN_CHANGE_CERTIFICATION = "false"')
+        self.assertContains(viewer, 'CAN_DELETE_CERTIFICATION = "false"')
         self.assertNotContains(viewer, "Add Certification")
-        self.assertNotContains(
-            viewer,
-            reverse("main:update_certification", args=[self.certification.id]),
-        )
-        self.assertNotContains(
-            viewer,
-            reverse("main:delete_certification", args=[self.certification.id]),
-        )
 
         self.client.force_login(self.editor)
         editor_view = self.client.get(reverse("main:show_certifications"))
+        self.assertContains(editor_view, 'CAN_ADD_CERTIFICATION = "false"')
+        self.assertContains(editor_view, 'CAN_CHANGE_CERTIFICATION = "true"')
+        self.assertContains(editor_view, 'CAN_DELETE_CERTIFICATION = "false"')
         self.assertNotContains(editor_view, "Add Certification")
-        self.assertContains(
-            editor_view,
-            reverse("main:update_certification", args=[self.certification.id]),
-        )
-        self.assertNotContains(
-            editor_view,
-            reverse("main:delete_certification", args=[self.certification.id]),
-        )
 
     def test_toggle_star_certification_adds_and_removes(self):
         star_url = reverse(
@@ -766,22 +861,24 @@ class CertificationTest(TestCase):
         self.assertTrue(response.url.startswith(reverse("main:login")))
         self.assertEqual(self.certification.starred_by.count(), 0)
 
-    def test_certification_star_count_and_status_in_template(self):
+    def test_certification_star_count_and_status_in_json(self):
         self.client.force_login(self.user)
         self.client.post(
             reverse("main:toggle_star_certification", args=[self.certification.id])
         )
-        response = self.client.get(reverse("main:show_certifications"))
+        response = self.client.get(reverse("main:get_certifications_json"))
+        data = json.loads(response.content)
 
-        self.assertContains(response, "Unstar")
-        self.assertContains(response, '<span class="star-count">1</span>', html=True)
+        self.assertEqual(data[0]["fields"]["star_count"], 1)
+        self.assertTrue(data[0]["fields"]["is_starred"])
+        self.assertEqual(data[0]["fields"]["starred_by_names"], "visitor")
 
-    def test_certifications_json_uses_natural_keys_for_stars(self):
+    def test_certifications_json_star_names_use_usernames(self):
         self.certification.starred_by.add(self.user)
         response = self.client.get(reverse("main:get_certifications_json"))
         data = json.loads(response.content)
 
-        self.assertEqual(data[0]["fields"]["starred_by"], [["visitor"]])
+        self.assertEqual(data[0]["fields"]["starred_by_names"], "visitor")
 
 
 class AuthenticationTest(TestCase):

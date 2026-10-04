@@ -16,6 +16,7 @@ from main.views import (
     logout_user,
     show_certifications,
     create_certification,
+    create_certification_ajax,
     update_certification,
     delete_certification,
     toggle_star_certification,
@@ -44,6 +45,11 @@ urlpatterns = [
     ),
     path("certifications/", show_certifications, name="show_certifications"),
     path("certifications/add/", create_certification, name="create_certification"),
+    path(
+        "certifications/add-ajax/",
+        create_certification_ajax,
+        name="create_certification_ajax",
+    ),
     path("certifications/<int:certification_id>/update/", update_certification, name="update_certification"),
     path("certifications/<int:certification_id>/delete/", delete_certification, name="delete_certification"),
     path(
