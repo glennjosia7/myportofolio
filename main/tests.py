@@ -243,6 +243,7 @@ class ProjectTest(TestCase):
         self.assertContains(response, 'id="grid"')
         self.assertContains(response, 'id="project-search-form"')
         self.assertContains(response, 'value="portfolio"')
+        self.assertContains(response, reverse("api:project-list"))
 
     def test_projects_json_endpoint_filters_and_exposes_star_fields(self):
         Project.objects.create(
@@ -565,8 +566,8 @@ class CertificationTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "certifications.html")
-        self.assertContains(response, reverse("main:get_certifications_json"))
-        self.assertContains(response, reverse("main:create_certification_ajax"))
+        self.assertContains(response, reverse("api:certification-list"))
+        self.assertContains(response, reverse("api:certification-star", args=[0]))
         self.assertContains(response, "csrfmiddlewaretoken")
 
     def test_empty_certifications_json_returns_empty_list(self):
