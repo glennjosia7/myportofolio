@@ -352,6 +352,56 @@ class CertificationAPITest(APITestCase):
             self.certification.name, "Web Security Fundamentals",
         )
 
+    def test_regular_user_cannot_create_or_delete(self):
+        self.client.force_authenticate(user=self.visitor)
+        self.assertEqual(
+            self.client.post(
+                self.list_url, self.payload, format="json",
+            ).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.delete(self.detail_url).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(Certification.objects.count(), 1)
+
+    def test_unsupported_methods_and_missing_certification(self):
+        self.client.force_authenticate(user=self.owner)
+        self.assertEqual(
+            self.client.delete(self.list_url).status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+        self.assertEqual(
+            self.client.patch(self.list_url, {}, format="json").status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+        self.assertEqual(
+            self.client.get(self.star_url).status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("api:certification-detail", args=[999999]),
+            ).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(
+            self.client.get(f"{self.list_url}not-an-int/").status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_star_is_tied_to_request_user(self):
+        self.client.force_authenticate(user=self.visitor)
+        self.client.post(self.star_url)
+        self.certification.refresh_from_db()
+        self.assertIn(self.visitor, self.certification.starred_by.all())
+
+        self.client.force_authenticate(user=self.owner)
+        data = self.client.get(self.detail_url).data
+        self.assertEqual(data["star_count"], 1)
+        self.assertFalse(data["is_starred"])
+
     def test_validation(self):
         self.client.force_authenticate(user=self.owner)
         for changes, field in [

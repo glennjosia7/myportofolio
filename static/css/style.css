@@ -115,6 +115,8 @@ a:focus-visible {
 
 .site-header nav {
     gap: 1.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .site-header nav a {

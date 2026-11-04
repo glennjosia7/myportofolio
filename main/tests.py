@@ -818,6 +818,38 @@ class CertificationTest(TestCase):
         self.assertEqual(self.certification.name, "Editor Updated Certificate")
         self.assertContains(response, "Certification berhasil diperbarui!")
 
+    def test_legacy_writes_cannot_bypass_permissions(self):
+        payload = {
+            "name": "Bypass Attempt",
+            "issuing_organization": "Attacker",
+            "issue_date": "2026-09-01",
+            "expiration_date": "",
+            "credential_id": "BYPASS-1",
+            "credential_url": "https://example.com/bypass",
+        }
+        self.client.force_login(self.user)
+        for url in [
+            reverse("main:create_certification"),
+            reverse("main:update_certification", args=[self.certification.id]),
+            reverse("main:delete_certification", args=[self.certification.id]),
+        ]:
+            with self.subTest(role="regular", url=url):
+                self.assertEqual(self.client.post(url, payload).status_code, 403)
+
+        self.client.force_login(self.editor)
+        for url in [
+            reverse("main:create_certification"),
+            reverse("main:delete_certification", args=[self.certification.id]),
+        ]:
+            with self.subTest(role="editor", url=url):
+                self.assertEqual(self.client.post(url, payload).status_code, 403)
+
+        self.assertEqual(Certification.objects.count(), 1)
+        self.certification.refresh_from_db()
+        self.assertEqual(
+            self.certification.name, "Web Security Fundamentals"
+        )
+
     def test_certification_controls_follow_permissions(self):
         owner = self.client.get(reverse("main:show_certifications"))
         self.assertContains(owner, 'CAN_ADD_CERTIFICATION = "true"')
