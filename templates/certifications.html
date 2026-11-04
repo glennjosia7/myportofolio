@@ -52,6 +52,10 @@
     {% include "components/certification_form_modal.html" %}
 {% endif %}
 
+{% if perms.main.change_certification %}
+    {% include "components/certification_edit_modal.html" %}
+{% endif %}
+
 {# Script baru tidak memakai form star/hapus, jadi token dibuat di sini. #}
 {% csrf_token %}
 <script>
@@ -59,8 +63,6 @@
     const BASE_CERTIFICATIONS_ENDPOINT = "{% url 'api:certification-list' %}";
     const DETAIL_CERTIFICATION_ENDPOINT = "{% url 'api:certification-detail' 0 %}";
     const STAR_CERTIFICATION_ENDPOINT = "{% url 'api:certification-star' 0 %}";
-    // URL legacy tetap dipakai untuk halaman edit yang sudah ada.
-    const UPDATE_URL_TEMPLATE = "{% url 'main:update_certification' 0 %}";
     const LOGIN_URL = "{% url 'main:login' %}";
     const CAN_ADD_CERTIFICATION = "{{ perms.main.add_certification|yesno:'true,false' }}" === "true";
     const CAN_CHANGE_CERTIFICATION = "{{ perms.main.change_certification|yesno:'true,false' }}" === "true";
@@ -76,6 +78,12 @@
     const searchForm = document.getElementById('certification-search-form');
     const searchInput = document.getElementById('search-input');
     const certificationForm = document.getElementById('certification-form');
+    const editCertificationForm = document.getElementById('edit-certification-form');
+    const editCertificationModal = document.getElementById('edit-certification-modal');
+    const EDITABLE_FIELDS = [
+        'name', 'issuing_organization', 'issue_date',
+        'expiration_date', 'credential_id', 'credential_url',
+    ];
     const SEARCH_DEBOUNCE_DELAY = 300;
     let searchDebounceTimer;
 
@@ -160,7 +168,7 @@
             : 'No expiration';
 
         const editHtml = CAN_CHANGE_CERTIFICATION
-            ? `<a href="${escapeHtml(buildUrl(UPDATE_URL_TEMPLATE, certification.id))}" class="button button-secondary">Edit</a>`
+            ? `<button type="button" class="button button-secondary" data-action="edit" data-id="${escapeHtml(certification.id)}">Edit</button>`
             : '';
         const deleteHtml = CAN_DELETE_CERTIFICATION
             ? `<button type="button" class="button button-danger" data-action="delete" data-id="${escapeHtml(certification.id)}">Delete</button>`
@@ -264,6 +272,55 @@
         }
     }
 
+    // Mengisi modal edit dari detail API, lalu menampilkannya
+    async function openEditCertification(id) {
+        try {
+            const response = await fetch(buildUrl(DETAIL_CERTIFICATION_ENDPOINT, id), {
+                headers: { Accept: 'application/json' },
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const certification = await response.json();
+            EDITABLE_FIELDS.forEach(function (name) {
+                editCertificationForm.elements.namedItem(name).value = certification[name] ?? '';
+            });
+            editCertificationForm.dataset.id = id;
+            editCertificationModal.showPopover();
+        } catch (error) {
+            showToast('Gagal memuat certification', error.message, 'error');
+        }
+    }
+
+    // Mengirim perubahan lewat PATCH ke endpoint detail DRF
+    async function updateCertification(event) {
+        event.preventDefault();
+        const submitButton = editCertificationForm.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        try {
+            const fields = new FormData(editCertificationForm);
+            const payload = Object.fromEntries(
+                EDITABLE_FIELDS.map(name => [name, fields.get(name)])
+            );
+            // PATCH butuh null (bukan string kosong) untuk mengosongkan tanggal.
+            if (!payload.expiration_date) payload.expiration_date = null;
+            await writeCertification(
+                buildUrl(DETAIL_CERTIFICATION_ENDPOINT, editCertificationForm.dataset.id),
+                'PATCH',
+                payload,
+            );
+            editCertificationModal.hidePopover();
+            showToast('Berhasil', 'Certification berhasil diperbarui!', 'success');
+            await fetchCertifications(searchInput.value.trim());
+        } catch (error) {
+            showToast('Gagal memperbarui certification', error.message, 'error');
+        } finally {
+            submitButton.disabled = false;
+        }
+    }
+
+    if (editCertificationForm) {
+        editCertificationForm.addEventListener('submit', updateCertification);
+    }
+
     if (certificationForm) {
         certificationForm.addEventListener('submit', addCertification);
     }
@@ -273,6 +330,10 @@
         const button = event.target.closest('button[data-action]');
         if (!button || button.disabled) return;
         const action = button.dataset.action;
+        if (action === 'edit') {
+            await openEditCertification(button.dataset.id);
+            return;
+        }
         if (action === 'delete' && !window.confirm('Yakin ingin menghapus certification ini?')) return;
         button.disabled = true;
         try {

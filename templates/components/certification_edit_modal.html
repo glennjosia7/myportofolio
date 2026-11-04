@@ -1,0 +1,57 @@
+<div id="edit-certification-modal"
+     class="project-form-modal"
+     popover="auto"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="edit-certification-modal-title">
+    <button type="button"
+            class="project-form-modal__backdrop"
+            popovertarget="edit-certification-modal"
+            popovertargetaction="hide"
+            aria-label="Tutup form edit certification"></button>
+    <div class="project-form-modal__content">
+        <button type="button"
+                class="project-form-modal__close"
+                popovertarget="edit-certification-modal"
+                popovertargetaction="hide"
+                aria-label="Tutup form edit certification">&times;</button>
+        <h2 id="edit-certification-modal-title">Edit Certification</h2>
+        <form id="edit-certification-form" class="project-form">
+            <div class="form-group">
+                <label for="edit-name">Certification Name</label>
+                <input type="text" name="name" id="edit-name" maxlength="255"
+                       placeholder="Google Cybersecurity Certificate" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-issuing-organization">Issuing Organization</label>
+                <input type="text" name="issuing_organization" id="edit-issuing-organization"
+                       maxlength="255" placeholder="Coursera" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-issue-date">Issue Date</label>
+                <input type="date" name="issue_date" id="edit-issue-date" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-expiration-date">Expiration Date</label>
+                <input type="date" name="expiration_date" id="edit-expiration-date">
+            </div>
+            <div class="form-group">
+                <label for="edit-credential-id">Credential ID</label>
+                <input type="text" name="credential_id" id="edit-credential-id"
+                       maxlength="255" placeholder="ABC-123-XYZ" required>
+            </div>
+            <div class="form-group">
+                <label for="edit-credential-url">Credential URL</label>
+                <input type="url" name="credential_url" id="edit-credential-url"
+                       maxlength="200" placeholder="https://example.com/verify" required>
+            </div>
+            <div class="project-form-modal__actions">
+                <button type="button"
+                        class="button button-secondary"
+                        popovertarget="edit-certification-modal"
+                        popovertargetaction="hide">Batal</button>
+                <button type="submit" class="button">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>

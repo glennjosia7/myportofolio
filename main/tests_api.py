@@ -279,6 +279,54 @@ class CertificationAPITest(APITestCase):
         self.certification.refresh_from_db()
         self.assertEqual(self.certification.name, "Editor Updated")
 
+    def test_editor_can_put_full_update(self):
+        self.client.force_authenticate(user=self.editor)
+        response = self.client.put(self.detail_url, self.payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.certification.refresh_from_db()
+        self.assertEqual(self.certification.name, "Cloud Practitioner")
+        self.assertEqual(self.certification.issuing_organization, "Amazon")
+
+    def test_editor_invalid_patch_does_not_change_database(self):
+        self.client.force_authenticate(user=self.editor)
+        response = self.client.patch(
+            self.detail_url, {"name": "   "}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.certification.refresh_from_db()
+        self.assertEqual(
+            self.certification.name, "Web Security Fundamentals",
+        )
+
+    def test_anonymous_cannot_write(self):
+        self.assertEqual(
+            self.client.post(
+                self.list_url, self.payload, format="json",
+            ).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.put(
+                self.detail_url, self.payload, format="json",
+            ).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.patch(
+                self.detail_url, {"name": "Nope"}, format="json",
+            ).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.delete(self.detail_url).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(Certification.objects.count(), 1)
+        self.certification.refresh_from_db()
+        self.assertEqual(
+            self.certification.name, "Web Security Fundamentals",
+        )
+
     def test_editor_cannot_create_or_delete(self):
         self.client.force_authenticate(user=self.editor)
         response = self.client.post(self.list_url, self.payload, format="json")
@@ -288,6 +336,10 @@ class CertificationAPITest(APITestCase):
             status.HTTP_403_FORBIDDEN,
         )
         self.assertEqual(Certification.objects.count(), 1)
+        self.certification.refresh_from_db()
+        self.assertEqual(
+            self.certification.name, "Web Security Fundamentals",
+        )
 
     def test_regular_user_cannot_patch(self):
         self.client.force_authenticate(user=self.visitor)

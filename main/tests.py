@@ -568,6 +568,8 @@ class CertificationTest(TestCase):
         self.assertTemplateUsed(response, "certifications.html")
         self.assertContains(response, reverse("api:certification-list"))
         self.assertContains(response, reverse("api:certification-star", args=[0]))
+        self.assertContains(response, reverse("api:certification-detail", args=[0]))
+        self.assertContains(response, 'id="edit-certification-modal"')
         self.assertContains(response, "csrfmiddlewaretoken")
 
     def test_empty_certifications_json_returns_empty_list(self):
@@ -829,6 +831,7 @@ class CertificationTest(TestCase):
         self.assertContains(viewer, 'CAN_CHANGE_CERTIFICATION = "false"')
         self.assertContains(viewer, 'CAN_DELETE_CERTIFICATION = "false"')
         self.assertNotContains(viewer, "Add Certification")
+        self.assertNotContains(viewer, 'id="edit-certification-modal"')
 
         self.client.force_login(self.editor)
         editor_view = self.client.get(reverse("main:show_certifications"))
@@ -836,6 +839,7 @@ class CertificationTest(TestCase):
         self.assertContains(editor_view, 'CAN_CHANGE_CERTIFICATION = "true"')
         self.assertContains(editor_view, 'CAN_DELETE_CERTIFICATION = "false"')
         self.assertNotContains(editor_view, "Add Certification")
+        self.assertContains(editor_view, 'id="edit-certification-modal"')
 
     def test_toggle_star_certification_adds_and_removes(self):
         star_url = reverse(
