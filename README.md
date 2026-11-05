@@ -38,10 +38,12 @@ Project ini merupakan hasil pengerjaan Tutorial 0 sampai Tutorial 4 serta Tugas 
 
 # Technology Stack
 
-- Django 5.2 untuk model, database, routing, form, serialization, unit test, dan rendering template.
-- Python 3.11 sebagai bahasa utama.
+- Django 5.2.18 untuk model, database, routing, form, serialization, unit test, dan rendering template.
+- Django REST Framework 3.18.3 untuk serializer, API view berbasis fungsi, permission class, dan Browsable API.
+- Python 3.11+ (proyek diuji pada Python 3.14.8) sebagai bahasa utama.
 - HTML5 untuk struktur dan semantik halaman.
 - CSS3 untuk layout, timeline, navbar sticky, modal popover, dan tampilan responsif.
+- JavaScript (fetch, AbortController, popover API) untuk interaksi AJAX tanpa framework frontend.
 - SQLite untuk database pengembangan lokal.
 - PostgreSQL (melalui `psycopg2-binary`) untuk database pada lingkungan PWS.
 - WhiteNoise untuk penyajian static files pada deployment.
@@ -51,17 +53,19 @@ Versi dependency minimum ada pada `requirements.txt`.
 
 # Setup Instruction
 
-```powershell
+```bash
 git clone https://github.com/glennjosia7/myportofolio.git
 cd myportofolio
-python -m venv env
-env\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
 python manage.py migrate
 python manage.py loaddata experiences achievements
-python manage.py test
+python manage.py test main
 python manage.py runserver
 ```
+
+Pada Windows, gunakan `py -m venv .venv` lalu `.venv\Scripts\activate` sebagai pengganti dua perintah venv di atas. Nama folder virtual environment bebas; `.venv` dan `env` sama-sama diabaikan Git.
 
 Buka `http://127.0.0.1:8000/` pada browser setelah server berjalan.
 
@@ -75,7 +79,7 @@ Database proyek dikelola melalui sistem migrasi Django.
 
 - `python manage.py makemigrations` membandingkan definisi model dengan riwayat migrasi dan membuat berkas instruksi perubahan skema (misalnya `main/migrations/0006_project.py` dan `0007_certification.py`). Pada tahap ini tabel belum dibuat.
 - `python manage.py migrate` menjalankan migrasi yang belum diterapkan sehingga tabel dan kolom benar-benar tersedia di database.
-- Riwayat migrasi proyek: `0001_initial` sampai `0007_certification`. Berkas migrasi ikut masuk Git agar struktur database dapat dibuat ulang pada lingkungan lain.
+- Riwayat migrasi proyek: `0001_initial` sampai `0009_certification_starred_by`. Berkas migrasi ikut masuk Git agar struktur database dapat dibuat ulang pada lingkungan lain.
 - `python manage.py makemigrations --check --dry-run` memastikan tidak ada perubahan model yang belum memiliki migrasi.
 - `python manage.py loaddata experiences achievements` memuat data awal dari `main/fixtures/` (fixture JSON).
 
@@ -248,15 +252,63 @@ Tugas 5 menerapkan seluruh pola interaktivitas JavaScript dari Tutorial 05 (AJAX
 
 3. **Jelaskan serangan XSS dan mengapa data yang ditampilkan lewat AJAX/JavaScript lebih rentan dibanding data yang dirender langsung oleh template Django.** XSS (Cross-Site Scripting) terjadi ketika input pengguna diperlakukan sebagai HTML/JavaScript dan dieksekusi oleh browser, misalnya `<img src="x" onerror="alert('XSS!')">`. Template Django otomatis meng-escape variabel (`{{ ... }}`) sehingga `<` menjadi `&lt;` dan tag tidak dieksekusi. Sebaliknya, data JSON yang disisipkan lewat `innerHTML` pada JavaScript tidak melewati auto-escape tersebut; bila nilai dikirim apa adanya, browser akan menafsirkannya sebagai HTML dan menjalankan skrip. Karena itu setiap nilai harus di-escape manual (`escapeHtml`/`textContent`) sekaligus dibersihkan di server dengan `strip_tags`.
 
+# Tugas 6 Implementation
+
+Tugas 6 menerapkan Django REST Framework pada bagian **Certifications**, mengikuti pola yang sudah dibuat untuk Projects pada Tutorial 07. Implementasi berada di `main/serializers.py`, `main/permissions.py`, `main/api_views.py`, dan `main/api_urls.py`.
+
+## Endpoint API
+
+| Method | URL | Hak akses | Status sukses |
+| --- | --- | --- | --- |
+| GET | `/api/v1/certifications/` | semua peran | 200 |
+| POST | `/api/v1/certifications/` | superuser | 201 |
+| GET | `/api/v1/certifications/<int:id>/` | semua peran | 200 |
+| PUT | `/api/v1/certifications/<int:id>/` | Editor, superuser | 200 |
+| PATCH | `/api/v1/certifications/<int:id>/` | Editor, superuser | 200 |
+| DELETE | `/api/v1/certifications/<int:id>/` | superuser | 204 |
+| POST | `/api/v1/certifications/<int:id>/star/` | pengguna login | 200 |
+
+Pencarian memakai query parameter `name` dan mencocokkan nama atau organisasi penerbit. Endpoint lama `get_certifications_json` dan halaman edit legacy tetap tersedia untuk kompatibilitas, tetapi halaman Certifications sekarang memakai API DRF.
+
+## Serializer, permission, dan frontend
+
+- `CertificationSerializer` adalah `ModelSerializer` dengan daftar field eksplisit. `star_count`, `is_starred`, dan `starred_by_names` adalah `SerializerMethodField` yang read-only; data akun seperti email dan password hash tidak ikut dikirim.
+- `validate_name`, `validate_issuing_organization`, dan `validate_credential_id` memakai `strip_tags`, sehingga tag HTML dibersihkan dan input yang hanya berisi tag ditolak.
+- `IsPortfolioOwnerOrEditorOrReadOnly` membaca `request.user.is_superuser` dan Django permission `main.change_certification`. Endpoint star memakai `IsAuthenticated` dan selalu memakai `request.user`, bukan ID dari client.
+- Halaman Certifications memakai `fetch()` untuk list, pencarian debounced 300 ms, create, edit melalui PATCH, delete, dan star. Setiap request tulis mengirim `X-CSRFToken`; nilai teks di-escape dengan `escapeHtml`, dan URL kredensial diperiksa `safeHttpUrl` sebelum dirender.
+- Modal edit memuat detail dari API, mengisi field yang ada, lalu mengirim PATCH. Error validasi `400`, penolakan `403`, dan kegagalan jaringan ditampilkan lewat toast tanpa menutup form.
+
+# Tugas 6 Reflection
+
+### Tugas 6
+
+1. **Jelaskan apa yang dimaksud dengan REST dan mengapa mengembalikan JSON saja belum cukup untuk menyebut sebuah API sebagai RESTful! Jelaskan pula perbedaan PUT dan PATCH beserta contoh kapan masing-masing sebaiknya digunakan.** REST (Representational State Transfer) adalah gaya arsitektur API yang memakai resource sebagai objek utama, URL sebagai penanda resource, method HTTP sebagai aksi, dan pertukaran representasi data yang tidak menyimpan state sesi di server. Pada proyek ini, `/api/v1/certifications/` adalah koleksi resource dan `/api/v1/certifications/5/` adalah satu certification. `GET` membaca, `POST` membuat, `PUT`/`PATCH` mengubah, dan `DELETE` menghapus. Mengembalikan JSON saja tidak otomatis membuat API RESTful: endpoint yang memakai satu URL untuk semua aksi, menyimpan state percakapan di server, atau tidak konsisten memakai method dan status HTTP tetap bukan REST. Yang dinilai adalah keseluruhan kontrak resource, method, status, dan representasi, bukan format payload semata.
+
+   `PUT` berarti mengganti representasi resource secara keseluruhan, sedangkan `PATCH` mengubah sebagian field. Pada `CertificationSerializer`, field `name`, `issuing_organization`, `issue_date`, `credential_id`, dan `credential_url` wajib diisi, sehingga `PUT /api/v1/certifications/5/` tanpa salah satunya menghasilkan `400`. Field `expiration_date` opsional; bila dihilangkan dari PUT, nilai lama tidak otomatis terhapus karena serializer hanya memperbarui atribut yang dikirim. Untuk mengosongkannya, kirim `null`. `PATCH` cocok untuk modal edit yang hanya mengirim field yang berubah, misalnya `{"name": "Cloud Practitioner"}`; `PUT` cocok ketika client memang mengirim seluruh data certification, misalnya dari form yang memuat semua field.
+
+2. **Jelaskan peran serializer pada Django REST Framework! Apa keuntungannya dibandingkan merakit dictionary secara manual dengan `JsonResponse` seperti pada Tutorial 05?** Serializer adalah lapisan yang mengubah objek model menjadi representasi data (serialization) dan sebaliknya mengubah data input menjadi objek Python yang tervalidasi (deserialization). `CertificationSerializer` menentukan field yang boleh keluar, menambahkan field hasil perhitungan seperti `star_count` dan `is_starred`, serta menjalankan validasi field dan objek sebelum data disimpan. Saat `POST` atau `PATCH`, `serializer.is_valid()` memeriksa tipe data, field wajib, format tanggal dan URL, lalu memanggil `validate_<field>` untuk membersihkan teks dengan `strip_tags`. Jika valid, `serializer.save()` membuat atau memperbarui instance.
+
+   Dengan `JsonResponse` manual, saya harus mengambil setiap atribut model, menghitung star sendiri, menentukan field mana yang boleh keluar, dan menulis validasi secara terpisah. Cara itu mudah menghasilkan inkonsistensi ketika model berubah dan rawan membocorkan field yang tidak disengaja. Serializer memusatkan kontrak representasi dan validasi di satu tempat, sehingga API view cukup menangani request, permission, dan status HTTP. Serializer juga bukan renderer: setelah data tervalidasi, renderer DRF yang mengubahnya menjadi JSON (atau HTML pada Browsable API).
+
+3. **Jelaskan perbedaan autentikasi dan otorisasi pada Django REST Framework! Mengapa hak akses harus diperiksa dengan permission class di server, bukan hanya dengan menyembunyikan tombol di template?** Autentikasi menjawab siapa pengguna yang mengirim request; otorisasi menjawab tindakan apa yang boleh dilakukan pengguna tersebut. Di proyek ini, `SessionAuthentication` membaca sesi Django dan mengisi `request.user`. Permission class kemudian memakai identitas itu: `IsPortfolioOwnerOrEditorOrReadOnly` mengizinkan semua orang membaca, pengguna login memberi star lewat `IsAuthenticated`, Editor boleh `PUT`/`PATCH` jika memiliki permission `main.change_certification`, dan hanya superuser yang boleh membuat atau menghapus. Jadi autentikasi saja tidak cukup: pengguna biasa sudah terautentikasi, tetapi tetap tidak boleh mengubah certification.
+
+   Menyembunyikan tombol Edit atau Delete di template hanya mengatur tampilan. Penyerang dapat mengirim `PATCH` atau `DELETE` langsung dengan `curl`, `fetch`, atau alat HTTP lain tanpa melewati UI. Karena itu keputusan akhir harus ada di server, pada permission class dan pengecekan Django permission. Template hanya membantu pengalaman pengguna; server tetap menolak request yang tidak berhak dengan `403`. Pengujian pada proyek ini membuktikan keduanya: tombol tidak muncul untuk pengguna biasa, dan request langsung ke endpoint tetap ditolak tanpa mengubah database.
+
+4. **Jelaskan mengapa permintaan yang mengubah data tetap memerlukan token CSRF ketika API memakai SessionAuthentication! Mengapa test yang memakai `force_authenticate` tidak cukup untuk membuktikan bahwa perlindungan CSRF berjalan?** Dengan `SessionAuthentication`, browser mengirim cookie sesi secara otomatis pada setiap request ke domain yang sama. Situs lain dapat memancing browser korban mengirim `POST`, `PUT`, `PATCH`, atau `DELETE` ke aplikasi; browser tetap menyertakan cookie sesi, sehingga server dapat mengira request itu berasal dari pengguna yang sah. Token CSRF mencegahnya karena token tidak dapat dibaca situs lain dan harus dikirim eksplisit, di proyek ini lewat header `X-CSRFToken` yang nilainya diambil dari cookie `csrftoken`. Server membandingkan token header dengan token sesi; request tanpa token atau dengan token salah ditolak `403`.
+
+   `force_authenticate()` hanya menempelkan objek user ke request di test client. Ia melewati proses login sesi, cookie, dan pemeriksaan CSRF, sehingga test tetap lolos meskipun perlindungan CSRF sebenarnya rusak. Karena itu test CSRF memakai `APIClient(enforce_csrf_checks=True)` dan `.login()` dengan kredensial nyata. Test negatif membuktikan `PATCH` tanpa token ditolak `403` dan database tidak berubah; test positif membuktikan `PATCH` dengan sesi dan token valid berhasil `200`. Keduanya bersama-sama menunjukkan bahwa SessionAuthentication dan CSRF benar-benar aktif, bukan hanya diasumsikan dari kode.
+
 # Testing
 
-```powershell
+```bash
 python manage.py check
 python manage.py makemigrations --check --dry-run
-python manage.py test
+python manage.py migrate --check
+python manage.py test main.tests_api
+python manage.py test main
 ```
 
-Test mencakup URL dan template, pengambilan data dari database, kondisi kosong, tahun opsional, escaping teks HTML, keberadaan file bukti, kesesuaian fixture, konsistensi navigasi, serta seluruh alur Tugas 3, Tugas 4, dan Tugas 5:
+Test API berada di `main/tests_api.py` dan memakai `APITestCase`. Cakupannya:
 
 - create, update, dan delete Project maupun Certification;
 - penolakan form tidak valid;
@@ -268,9 +320,13 @@ Test mencakup URL dan template, pengambilan data dari database, kondisi kosong, 
 - autentikasi: register, login (cookie `last_login`), logout, dan tampilan navbar;
 - otorisasi Certification: pengunjung dialihkan ke login, pengguna biasa `403`, Editor boleh update tetapi `403` untuk create/delete, pemilik boleh semuanya;
 - penyembunyian tombol aksi dan flag permission pada template;
-- star pada Project dan Certification (tambah, batalkan, maksimal satu per pengguna) serta username pada JSON.
+- star pada Project dan Certification (tambah, batalkan, maksimal satu per pengguna) serta username pada JSON;
+- empat peran pada API Certifications, termasuk penolakan `403` dan pengecekan isi database setelah request ditolak;
+- validasi serializer: nama kosong, tag HTML, URL tidak valid, dan tanggal tidak valid;
+- CSRF dengan sesi nyata: request tanpa token ditolak `403`, request dengan token berhasil;
+- method yang tidak didukung (`405`), ID yang tidak ada (`404`), serta field star yang read-only.
 
-Pemeriksaan lokal terakhir pada 4 Oktober 2026: 66 test lulus (`python manage.py test`), `check` tidak menemukan masalah, dan tidak ada perubahan model yang belum memiliki migrasi. Alur empat peran (pengunjung, pengguna biasa, Editor, pemilik) juga diperiksa pada browser, termasuk status `403`, penyembunyian tombol, star, dan penghapusan cookie `last_login` saat logout. Test berjalan di database test terpisah sehingga tidak menghapus data portofolio lokal.
+Pemeriksaan final pada 5 November 2026: `check` bersih, tidak ada migrasi tertunda, 34 API test lulus, dan 101 total test `main` lulus. Alur empat peran, modal edit, pencarian, dan tampilan responsif juga diperiksa dengan browser. Test berjalan di database test terpisah sehingga tidak menghapus data portofolio lokal.
 
 # Reflection Questions
 
@@ -292,7 +348,7 @@ Setelah itu, `show_certifications` membaca isi response JSON dan menggunakan `se
 
 # AI Disclosure
 
-Pengembangan project ini mendapatkan bantuan dari **AI ChatGPT Web** untuk proses brainstorming, review struktur kode, debugging error, dan mendapatkan rekomendasi improvement. Seluruh implementasi akhir tetap melalui proses pemahaman, pengecekan, dan perubahan manual oleh developer.
+Pengembangan project ini mendapatkan bantuan AI untuk brainstorming, review struktur kode, debugging error, dan rekomendasi improvement. Sejak Tugas 6, bantuan tidak hanya berasal dari ChatGPT Website: sebagian audit repository, penulisan kode, test, dan dokumentasi dikerjakan melalui OpenCode dengan model DeepSeek V4.1 Flash. Keputusan lingkup, verifikasi hasil, dan seluruh operasi Git tetap dilakukan oleh developer. Rincian perangkat dan batasannya dijelaskan pada bagian **Penggunaan AI pada Tugas 6**.
 
 Dalam pengerjaan Tugas 3, bantuan AI ChatGPT Web digunakan untuk:
 
@@ -324,6 +380,53 @@ Dalam pengerjaan Tugas 5, bantuan **AI ChatGPT Web** (ChatGPT Website) digunakan
 
 Strategi prompting yang dipakai adalah meminta penjelasan konsep terlebih dahulu, lalu meminta contoh kode kecil, kemudian membandingkan hasilnya dengan pola yang sudah ada di halaman Projects. Setiap jawaban diperiksa dengan menjalankan `python manage.py test` dan mencoba alurnya di browser. Penulisan kode akhir, penyesuaian nama variabel, dan pengujian dilakukan manual.
 
+### Penggunaan AI pada Tugas 6
+
+Tugas 6 dikerjakan melalui tiga checkpoint: Progress 1 (implementasi modal edit DRF), Progress 2 (audit izin, CSRF, dan browser QA), dan finalisasi (README, disclosure, regresi). Dua antarmuka AI dipakai dengan peran berbeda.
+
+**ChatGPT Website** digunakan untuk membantu memahami ketentuan tugas, menyusun rencana pengerjaan bertahap, menyusun prompt audit, dan meninjau hasil tiap checkpoint. ChatGPT tidak dipakai sebagai bukti bahwa kode sudah benar; keputusan akhir tetap mengacu pada kode dan hasil test di repository.
+
+**OpenCode dengan model DeepSeek V4.1 Flash** digunakan untuk:
+
+- membaca repository dan membandingkan implementasi dengan checklist `tugas-6.pdf`;
+- mengimplementasikan modal edit Certifications pada Progress 1;
+- menambah test peran, CSRF, method, dan route legacy;
+- menjalankan `manage.py check`, test API, dan seluruh test `main`;
+- menjalankan verifikasi browser dengan Playwright untuk empat peran, modal, kontras, dan layout responsif;
+- menyusun `docs/tugas-6/PROGRESS_1.md`, `PROGRESS_2.md`, dan laporan final.
+
+**Developer** menentukan lingkup tiap checkpoint, menyetujui perubahan, memeriksa hasil, dan menjalankan seluruh operasi Git (`add`, `commit`, `push`). Tidak ada commit yang dibuat otomatis oleh AI.
+
+Strategi prompting yang dipakai:
+
+1. Baca ketentuan tugas dan repository sebelum menulis kode.
+2. Audit dulu, implementasi kemudian; gap dicatat dengan bukti file dan baris.
+3. Batasi tiap checkpoint pada satu irisan pekerjaan yang dapat diuji.
+4. Verifikasi dengan test otomatis, lalu browser untuk perilaku nyata.
+5. Periksa ulang permission dan CSRF secara eksplisit, bukan hanya status UI.
+6. Akhiri tiap checkpoint dengan laporan, diff, dan rekomendasi commit manual.
+
+Batasan yang ditemukan selama pengerjaan:
+
+- AI tidak dapat mengetahui perilaku runtime hanya dari membaca kode; karena itu browser test dan `runserver` tetap diperlukan.
+- Test otomatis hanya membuktikan skenario yang ditulis. Test yang lulus tidak menjamin tidak ada seluruh kemungkinan celah.
+- Verifikasi browser mencakup alur yang diuji, bukan seluruh kombinasi perangkat dan pembaca layar.
+- Saran AI harus disesuaikan dengan arsitektur yang sudah ada; misalnya permission Certifications tetap memakai `has_perm("main.change_certification")`, bukan pemeriksaan nama grup yang lebih lemah.
+- Lingkungan lokal bukan produksi. Perilaku PWS dan konfigurasi HTTPS tidak dibuktikan oleh test lokal.
+
+## Prompt pembelajaran Tugas 6
+
+Prompt berikut dipakai untuk mengarahkan pekerjaan berbasis bukti (diringkas dari percakapan sebenarnya):
+
+1. "Baca `tugas-6.pdf` dan audit repository. Buat matriks kebutuhan, tandai PASS/PARTIAL/FAIL, dan tunjukkan bukti file."
+2. "Fokus pada satu gap prioritas: edit Certification harus memakai PATCH/PUT API, bukan halaman form legacy. Implementasikan perubahan terkecil dan uji."
+3. "Periksa matriks empat peran, route legacy, dan CSRF dengan sesi nyata. Cek isi database setelah request ditolak, bukan hanya status HTTP."
+4. "Jalankan browser QA untuk pengguna biasa, anonymous, Editor, dan superuser. Verifikasi request jaringan, toast, modal, serta layout 390/768/1440 px."
+5. "Ukur kontras modal dan periksa perilaku keyboard. Perbaiki hanya jika ada bukti cacat."
+6. "Untuk finalisasi, tulis empat jawaban reflektif dan AI disclosure yang jujur. Jangan mengarang tautan percakapan atau hasil test."
+
+Tautan percakapan ChatGPT Website untuk Tugas 6 belum disediakan saat repository ini disiapkan, sehingga tidak dicantumkan. Tautan yang tidak tersedia tidak dibuat-buat. Catatan prompt Tugas 6 diringkas melalui strategi di atas; log mentah dan data sensitif tidak dimasukkan ke repository.
+
 ## Prompt pembelajaran Tugas 5 (AI ChatGPT Web)
 
 1. Jelaskan konsep debouncing pada pencarian AJAX. Mengapa mengirim request di setiap ketikan itu boros, dan bagaimana `setTimeout` + `clearTimeout` menyelesaikannya? Berikan contoh dengan jeda 300 ms.
@@ -342,7 +445,7 @@ Strategi prompting yang dipakai adalah meminta penjelasan konsep terlebih dahulu
 - Percakapan Tugas 4 (AI ChatGPT Web): https://chatgpt.com/share/6ab9d9ae-0eac-83ec-8fcf-61b219ed6618
 - Percakapan Tugas 5 (AI ChatGPT Web): https://chatgpt.com/share/6ac28198-0f0c-83ec-abeb-4ea8b4cc989b
 
-Log prompt pembelajaran Tugas 1-3 disimpan di luar repository sebagai catatan pribadi dan tidak di-commit, karena ketentuan tugas tidak mewajibkannya. Log prompt pembelajaran Tugas 5 dicantumkan pada bagian **Prompt pembelajaran Tugas 5** di atas. Ganti `ISI-TAUTAN-SHARE-TUGAS-5` dengan tautan percakapan ChatGPT Web Tugas 5 sebelum submit.
+Log prompt pembelajaran Tugas 1-3 disimpan di luar repository sebagai catatan pribadi dan tidak di-commit, karena ketentuan tugas tidak mewajibkannya. Log prompt pembelajaran Tugas 5 dicantumkan pada bagian **Prompt pembelajaran Tugas 5** di atas. Percakapan ChatGPT Website untuk Tugas 6 belum tersedia saat finalisasi, sehingga tidak ada tautan Tugas 6 yang dicantumkan.
 
 # Progres Mingguan
 

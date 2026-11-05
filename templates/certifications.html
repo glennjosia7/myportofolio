@@ -78,6 +78,7 @@
     const searchForm = document.getElementById('certification-search-form');
     const searchInput = document.getElementById('search-input');
     const certificationForm = document.getElementById('certification-form');
+    const addCertificationModal = document.getElementById('add-certification-modal');
     const editCertificationForm = document.getElementById('edit-certification-form');
     const editCertificationModal = document.getElementById('edit-certification-modal');
     const EDITABLE_FIELDS = [
@@ -123,6 +124,43 @@
             .find(value => value.startsWith(prefix));
         return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
     }
+
+    // Fokus masuk ke field pertama saat modal terbuka dan tetap di dalam dialog.
+    function setupModalFocus(modal, form) {
+        if (!modal || !form) return;
+        const focusableSelector = [
+            'button:not(.project-form-modal__backdrop):not([disabled])',
+            'input:not([disabled])',
+            'select:not([disabled])',
+            'textarea:not([disabled])',
+            'a[href]',
+        ].join(', ');
+        modal.addEventListener('toggle', function (event) {
+            if (event.newState === 'open') {
+                const firstField = form.querySelector('input:not([type="hidden"])');
+                // Tunggu popover selesai ditampilkan sebelum memindahkan fokus.
+                if (firstField) setTimeout(() => firstField.focus(), 0);
+            }
+        });
+        modal.addEventListener('keydown', function (event) {
+            if (event.key !== 'Tab') return;
+            const focusable = Array.from(modal.querySelectorAll(focusableSelector))
+                .filter(element => element.offsetParent !== null);
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+    }
+
+    setupModalFocus(addCertificationModal, certificationForm);
+    setupModalFocus(editCertificationModal, editCertificationForm);
 
     // Mengganti id dummy 0 pada URL template dengan id asli
     function buildUrl(template, id) {
