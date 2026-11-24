@@ -204,3 +204,35 @@ Keterbatasan yang tetap diperhatikan: penjelasan AI dapat keliru, test otomatis 
 - Percakapan Tugas 4 (AI ChatGPT Web): https://chatgpt.com/share/6ab9d9ae-0eac-83ec-8fcf-61b219ed6618
 - Percakapan Tugas 5 (AI ChatGPT Web): https://chatgpt.com/share/6ac28198-0f0c-83ec-abeb-4ea8b4cc989b
 - Percakapan Tugas 6 (AI ChatGPT Web): https://chatgpt.com/share/6aeda796-a468-83ec-a834-3cdf379434aa
+
+## Tutorial 10 — Integrasi Flutter dan DRF
+
+Gunakan virtual environment Django. Untuk lingkungan lokal:
+
+```bash
+python -m pip install -r requirements.txt
+python manage.py migrate
+python manage.py check
+python manage.py test main
+python manage.py runserver 127.0.0.1:8000
+```
+
+Migrasi membuat tabel token melalui `rest_framework.authtoken`. Login token
+menggunakan `POST /api/v1/auth/token/` dengan JSON `username` dan `password`.
+Kirim token pada header `Authorization: Token <token>` untuk mutasi proyek.
+`POST /api/v1/auth/logout/` mencabut token pemanggil dan mengembalikan 204.
+SessionAuthentication dan CSRF tetap berlaku untuk klien web Django. Sesi web
+Django tetap aktif jika memanggil endpoint logout token sebagai klien sesi.
+
+| Aksi | Akses |
+|---|---|
+| `GET /api/v1/projects/` | Publik |
+| `POST /api/v1/projects/` | Superuser, memakai token atau sesi dengan CSRF |
+| `POST /api/v1/auth/logout/` | Pengguna terautentikasi |
+
+CORS berlaku pada `/api/v1/`. Saat `DEBUG=True` dan `PRODUCTION=False`,
+origin HTTP `localhost` dan `127.0.0.1` untuk Flutter Web diizinkan.
+Untuk produksi, set `CORS_ALLOWED_ORIGINS` ke daftar origin HTTPS tepercaya
+yang dipisah koma. Biarkan kosong jika tidak ada Flutter Web lintas origin.
+Gunakan HTTPS untuk transmisi kredensial, termasuk login dan logout token.
+Lihat [laporan backend](docs/tutorial-10/BACKEND_REPORT.md).

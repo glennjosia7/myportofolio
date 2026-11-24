@@ -1,7 +1,8 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.authentication import SessionAuthentication
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import (
     api_view, authentication_classes, permission_classes,
 )
@@ -15,8 +16,24 @@ from main.permissions import (
 from main.serializers import CertificationSerializer, ProjectSerializer
 
 
+class ProjectTokenAuthentication(TokenAuthentication):
+    def authenticate_header(self, request):
+        # Retain the former 403 response for anonymous web writes without a token.
+        if request.headers.get("Authorization", "").lower().split()[:1] == ["token"]:
+            return super().authenticate_header(request)
+        return None
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def api_logout(request):
+    if isinstance(request.auth, Token):
+        request.auth.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 @api_view(["GET", "HEAD", "POST"])
-@authentication_classes([SessionAuthentication])
+@authentication_classes([ProjectTokenAuthentication, SessionAuthentication])
 @permission_classes([IsPortfolioOwnerOrReadOnly])
 def project_list(request):
     if request.method in ("GET", "HEAD"):

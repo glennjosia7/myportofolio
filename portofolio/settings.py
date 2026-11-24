@@ -53,12 +53,15 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'main',
     'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -162,3 +165,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # gunakan https:// tanpa trailing slash
 CSRF_TRUSTED_ORIGINS = ["https://glenn-josia-myportofolio.pws.cs.ui.ac.id"]
+
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+}
+
+CORS_URLS_REGEX = r"^/api/v1/"
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+CORS_ALLOWED_ORIGIN_REGEXES = (
+    [r"^http://(?:localhost|127\.0\.0\.1)(?::[0-9]+)?$"]
+    if DEBUG and not PRODUCTION else []
+)
