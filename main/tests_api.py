@@ -4,6 +4,7 @@ from datetime import date
 from django.contrib.auth.models import Group, Permission, User
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APITestCase
 
 from main.models import Certification, Project
@@ -479,3 +480,92 @@ class CertificationAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.certification.refresh_from_db()
         self.assertEqual(self.certification.name, "Editor via CSRF")
+
+    def _obtain_token(self, username):
+        response = self.client.post(
+            reverse("api:api_token_auth"),
+            {"username": username, "password": "test-password"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["token"]
+
+    def test_token_authenticated_owner_can_create_certification(self):
+        self.assertEqual(self.client.get(self.list_url).status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            self.client.post(self.list_url, self.payload, format="json").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        auth = f"Token {self._obtain_token(self.owner.username)}"
+
+        without_expiry = self.client.post(
+            self.list_url, self.payload, format="json", HTTP_AUTHORIZATION=auth,
+        )
+        self.assertEqual(without_expiry.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(without_expiry.data["expiration_date"])
+        self.assertTrue(Certification.objects.filter(pk=without_expiry.data["id"]).exists())
+
+        with_expiry = self.client.post(
+            self.list_url,
+            {**self.payload, "name": "Expiring Cert", "expiration_date": "2029-08-01"},
+            format="json",
+            HTTP_AUTHORIZATION=auth,
+        )
+        self.assertEqual(with_expiry.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(with_expiry.data["expiration_date"], "2029-08-01")
+
+    def test_token_authenticated_non_owner_cannot_create_certification(self):
+        for user in (self.visitor, self.editor):
+            with self.subTest(user=user.username):
+                auth = f"Token {self._obtain_token(user.username)}"
+                response = self.client.post(
+                    self.list_url, self.payload, format="json", HTTP_AUTHORIZATION=auth,
+                )
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Certification.objects.count(), 1)
+
+    def test_invalid_and_revoked_token_rejected_with_401(self):
+        invalid = self.client.post(
+            self.list_url,
+            self.payload,
+            format="json",
+            HTTP_AUTHORIZATION="Token invalid-token",
+        )
+        self.assertEqual(invalid.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        key = self._obtain_token(self.owner.username)
+        auth = f"Token {key}"
+        logout_response = self.client.post(
+            reverse("api:api_logout"), HTTP_AUTHORIZATION=auth,
+        )
+        self.assertEqual(logout_response.status_code, status.HTTP_204_NO_CONTENT)
+        after_logout = self.client.post(
+            self.list_url, self.payload, format="json", HTTP_AUTHORIZATION=auth,
+        )
+        self.assertEqual(after_logout.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        fresh_auth = f"Token {self._obtain_token(self.owner.username)}"
+        Token.objects.filter(user=self.owner).delete()
+        after_db_revoke = self.client.post(
+            self.list_url, self.payload, format="json", HTTP_AUTHORIZATION=fresh_auth,
+        )
+        self.assertEqual(after_db_revoke.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(Certification.objects.count(), 1)
+
+    def test_session_create_enforces_csrf(self):
+        client = APIClient(enforce_csrf_checks=True)
+        self.assertTrue(client.login(username="owner", password="test-password"))
+        without_csrf = client.post(self.list_url, self.payload, format="json")
+        self.assertEqual(without_csrf.status_code, status.HTTP_403_FORBIDDEN)
+
+        page = client.get(self.list_url, HTTP_ACCEPT="text/html")
+        self.assertEqual(page.status_code, status.HTTP_200_OK)
+        token = client.cookies["csrftoken"].value
+        with_csrf = client.post(
+            self.list_url,
+            self.payload,
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(with_csrf.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Certification.objects.count(), 2)
